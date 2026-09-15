@@ -74,7 +74,17 @@ python3 test_roundtrip.py    # colour round-trip + line-ending/BOM guard
 python3 test_tui.py          # drives the TUI in a pty, ~43 key presses
 ```
 
-Both need a save at `M20.mdrgslot` in your standard saves directory.
+Both need a save file to run against — **any slot works**, M20 is not special.
+They auto-detect one in your platform's standard saves directory, or you can
+point at a specific slot:
+
+```bash
+python3 test_roundtrip.py /path/to/A1.mdrgslot
+MDRG_TEST_SAVE=/path/to/A1.mdrgslot python3 test_tui.py
+```
+
+Your real saves are never modified: each test copies the slot to a temporary
+directory and works on the copy.
 
 ## Environment variables
 

@@ -52,7 +52,7 @@ IS_MAC = sys.platform == "darwin"
 
 
 def reconfigure_stdout():
-    """Ask for UTF-8 output on Windows so the nice glyphs work when possible."""
+    """Ask for UTF-8 output on Windows so the nice glyphs work when possible"""
     if not IS_WINDOWS:
         return
     for stream in (sys.stdout, sys.stderr):
@@ -66,7 +66,7 @@ reconfigure_stdout()
 
 
 def _console_is_unicode():
-    """True when stdout can encode the box-drawing glyphs we like to use."""
+    """True when stdout can encode the box-drawing glyphs we like to use"""
     if os.environ.get("MDRG_ASCII"):
         return False
     if os.environ.get("MDRG_UNICODE"):
@@ -87,7 +87,7 @@ H_LINE = BULLET = ARROW = DASH = CHECK = CROSS = UP = DN = LEFT = RIGHT = ""
 
 
 def set_ascii_mode(force_ascii=False):
-    """(Re)choose the output glyph set. Called again once args are parsed."""
+    """(Re)choose the output glyph set. Called again once args are parsed"""
     global _UNI, H_LINE, BULLET, ARROW, DASH, CHECK, CROSS, UP, DN, LEFT, RIGHT
     _UNI = False if force_ascii else _console_is_unicode()
     H_LINE = "─" if _UNI else "-"
