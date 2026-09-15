@@ -5,7 +5,7 @@ Three frontends over one parser: command-line subcommands, a full-screen curses
 TUI, and a small tkinter GUI.
 
 Standard library only — no dependencies for editing. Works on Linux, Windows
-and macOS. (hopefully)
+and macOS.
 
 ## Quick start
 
@@ -24,6 +24,8 @@ folder**.
 
 ## Commands
 
+### Inspection
+
 | Command | Purpose |
 |---|---|
 | `scan` | Scan a Saves directory |
@@ -33,16 +35,26 @@ folder**.
 | `find` | Search saves for an item by name |
 | `slotsdb` | Show which items can go in each slot |
 | `color` | View or set item colours (0-255 display) |
+| `backups` | List or restore `.bak` backups |
+| `tree` | Dump with item names and colours resolved |
+| `export` | Export a normalised JSON summary |
+| `where` | Platform info and Saves directories checked |
+
+### Editing
+
+| Command | Purpose |
+|---|---|
+| `edit` | Interactive curses TUI editor — navigate, edit scalars, add/delete items, rename, clone, undo/redo |
+| `gui` | Small tkinter analyzer window |
+
+### Data manipulation
+
+| Command | Purpose |
+|---|---|
 | `additem` / `delitem` | Add or remove items |
 | `dupe` | Duplicate items with fresh GUIDs |
 | `equip` | Equip / unequip an item |
 | `validate` | Sanity-check a save file |
-| `backups` | List or restore `.bak` backups |
-| `tree` | Dump with item names and colours resolved |
-| `export` | Export a normalised JSON summary |
-| `edit` | Interactive curses TUI editor |
-| `gui` | Small tkinter analyzer window |
-| `where` | Platform info and Saves directories checked |
 
 Run `python3 mdrg-savefile-editor.py --help` for the full list.
 

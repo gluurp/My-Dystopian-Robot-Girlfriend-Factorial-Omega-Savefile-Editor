@@ -2,11 +2,10 @@
 """
 mdrg-savefile-editor — inspect and edit My Dystopian Robot Girlfriend save files.
 
-Three frontends over one parser:
+Two frontends over one parser:
 
   CLI     subcommands (scan, stats, inventory, color, additem, ...)
   TUI     `edit`  — full-screen curses editor
-  GUI     `gui`   — small tkinter analyzer
 
 Handles both formats:
   - Current (0.97.x): save.mdrg (registry) + *.mdrgslot (game state) + PlayerPrefs.pp
@@ -514,7 +513,7 @@ def analysis_records(path, data=None):
 
 
 def format_analysis(path, record):
-    """Build a concise, human-readable summary shared by CLI and GUI"""
+    """Build a concise, human-readable summary for the analyze/report views"""
     path = Path(path)
     lines = [f"=== {path.name} ==="]
     if not record:
@@ -872,61 +871,6 @@ def cmd_analyze(args):
             print(f"Error: {path}: {exc}", file=sys.stderr)
             continue
     print("\n\n".join(results))
-
-
-def cmd_gui(args):
-    """Open a small Tk GUI backed by the same parser as the CLI."""
-    try:
-        import tkinter as tk
-        from tkinter import filedialog
-    except ImportError as exc:
-        print(f"Error: Tk is unavailable: {exc}", file=sys.stderr)
-        sys.exit(1)
-
-    root = tk.Tk()
-    root.title("MDRG Save Analyzer")
-    root.geometry("760x560")
-    root.minsize(560, 360)
-
-    frame = tk.Frame(root, padx=12, pady=12)
-    frame.pack(fill="both", expand=True)
-    toolbar = tk.Frame(frame)
-    toolbar.pack(fill="x", pady=(0, 8))
-    output = tk.Text(frame, wrap="none", font=("TkFixedFont", 10), state="disabled")
-    output.pack(fill="both", expand=True)
-
-    def show(paths):
-        chunks = []
-        for path in paths:
-            try:
-                data = load_data(path)
-                records = analysis_records(path, data)
-                chunks.extend(format_analysis(path, record) for record in records)
-                if not records:
-                    chunks.append(format_analysis(path, None))
-            except Exception as exc:
-                chunks.append(f"{Path(path).name}: parse error: {exc}")
-        output.configure(state="normal")
-        output.delete("1.0", "end")
-        output.insert("1.0", "\n\n".join(chunks))
-        output.configure(state="disabled")
-
-    def choose():
-        paths = filedialog.askopenfilenames(
-            title="Choose MDRG save files",
-            filetypes=[("MDRG saves", "*.mdrg *.mdrgslot"), ("All files", "*")],
-        )
-        if paths:
-            show(paths)
-
-    tk.Button(toolbar, text="Open saves...", command=choose).pack(side="left")
-    if args.files:
-        show(args.files)
-    else:
-        output.configure(state="normal")
-        output.insert("1.0", "Open one or more .mdrg or .mdrgslot files to analyze them.")
-        output.configure(state="disabled")
-    root.mainloop()
 
 
 def cmd_flags(args):
@@ -3043,9 +2987,6 @@ def main():
     p_analyze = sub.add_parser("analyze", help="Analyze one or more save files")
     p_analyze.add_argument("files", nargs="+", help="Paths to .mdrg or .mdrgslot files")
 
-    p_gui = sub.add_parser("gui", help="Open the graphical save analyzer")
-    p_gui.add_argument("files", nargs="*", help="Optional save files to open immediately")
-
     p_flags = sub.add_parser("flags", help="List all flags from a slot file")
     p_flags.add_argument("file", help="Path to .mdrgslot file")
 
@@ -3174,7 +3115,6 @@ def main():
         "info":         cmd_info,
         "stats":        cmd_stats,
         "analyze":      cmd_analyze,
-        "gui":          cmd_gui,
         "flags":        cmd_flags,
         "emails":       cmd_emails,
         "items":        cmd_items,
