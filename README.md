@@ -1,7 +1,8 @@
 # MDRG Save File Editor
 
-A cross-platform command-line save editor for My Dystopian Robot Girlfriend (!Ω Factorial Omega)
-
+A cross-platform save editor for My Dystopian Robot Girlfriend (!Ω Factorial Omega).
+Three frontends over one parser: command-line subcommands, a full-screen curses
+TUI, and a small tkinter GUI.
 
 Standard library only — no dependencies for editing. Works on Linux, Windows
 and macOS. (hopefully)
@@ -9,10 +10,10 @@ and macOS. (hopefully)
 ## Quick start
 
 ```bash
-python3 mdrg-savefile-editor.py where               # show platform + detected save dirs
-python3 mdrg-savefile-editor.py slots               # list every save slot with progression
-python3 mdrg-savefile-editor.py inventory           # rich inventory view of a save
-python3 mdrg-savefile-editor.py edit M7.mdrgslot    # interactive TUI editor
+python3 mdrg-savefile-editor.py where            # platform + detected save dirs
+python3 mdrg-savefile-editor.py slots            # all save slots + progression
+python3 mdrg-savefile-editor.py inventory        # rich inventory view of a save
+python3 mdrg-savefile-editor.py edit M7.mdrgslot # interactive TUI editor
 ```
 
 On Windows use `mdrg-savefile-editor.cmd scan` instead, or `py mdrg-savefile-editor.py scan`.
@@ -40,6 +41,7 @@ folder**.
 | `tree` | Dump with item names and colours resolved |
 | `export` | Export a normalised JSON summary |
 | `edit` | Interactive curses TUI editor |
+| `gui` | Small tkinter analyzer window |
 | `where` | Platform info and Saves directories checked |
 
 Run `python3 mdrg-savefile-editor.py --help` for the full list.
@@ -52,32 +54,27 @@ Run `python3 mdrg-savefile-editor.py --help` for the full list.
 
 ## Safety
 
-Every write takes a `.bak` backup **before** modifying anything. Just in case my script mangles anything or if a user mangles anything
+Every write takes a `.bak` backup **before** anything is modified, in case the
+tool or the user mangles something. List and restore them with:
 
-`tests/test_roundtrip.py` enforces this on every run.
-
-## Repo contents
-
-Everything in this list is tracked and published:
-
-```
-mdrg-savefile-editor.py    the editor (CLI subcommands + curses TUI + tkinter GUI)
-mdrg-savefile-editor.cmd   Windows launcher
-item_ids.txt               gameID -> ItemEnum name  (required at runtime)
-items_by_slot.json         slot -> allowed items    (optional; powers `slotsdb`)
-docs/                      reverse-engineering notes on the save format
-tests/                     round-trip and TUI test suites
-README.md
-.gitignore
+```bash
+python3 mdrg-savefile-editor.py backups M20.mdrgslot
+python3 mdrg-savefile-editor.py backups M20.mdrgslot --restore
 ```
 
-Deliberately **not** published — kept locally only and git-ignored:
+Save files use bare LF line endings and no BOM, and the tool preserves that
+exactly — a save with no edits comes back byte-identical. `tests/test_roundtrip.py`
+asserts this on every run.
 
+## Tests
+
+```bash
+cd tests
+python3 test_roundtrip.py    # colour round-trip + line-ending/BOM guard
+python3 test_tui.py          # drives the TUI in a pty, ~43 key presses
 ```
-tools/    the scripts that regenerate item_ids.txt from the game assembly.
-          Only needed if the game updates and adds or renames items.
-          See tools/README.md (local) for the pipeline.
-```
+
+Both need a save at `M20.mdrgslot` in your standard saves directory.
 
 ## Environment variables
 
