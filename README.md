@@ -67,6 +67,16 @@ backup copy somewhere else.
 Each row shows the file's size and last-modified date so you can spot the save
 you actually want. Backups are dimmed.
 
+**Moving between saves.** The list and the editor are two levels of one
+navigation model. Backing out of a file's root (`a` or `←`) returns you to the
+list, so you can hop between saves without quitting and re-running the tool.
+Back goes up exactly one level at a time, just like it does between sections
+inside a file.
+
+`ESC` deliberately does *not* go up a level. Arrow keys arrive as
+`ESC` + `[` + letter, so a split read can deliver a bare `ESC` — if that
+navigated, a stray arrow press would bounce you out of the file mid-edit.
+
 **Backups.** Pressing `Enter` on a `.bak` asks what you want to do with it:
 
 | Choice | What happens |

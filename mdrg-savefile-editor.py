@@ -1373,30 +1373,51 @@ ITEM_NAMES = {}
 _COLOR_KEYS = ("r", "g", "b", "a")
 
 
+def _data_file(name):
+    """Locate a shipped data file, first hit wins
+
+    Checked in order:
+      <script dir>/<name>        the documented location
+      <script dir>/data/<name>   data kept out of the repo root
+      <script dir>/docs/<name>   also accepted, for convenience
+
+    These are runtime dependencies, not documentation - without item_ids.txt
+    every item renders as a bare #id and `find` by name matches nothing.
+    """
+    here = Path(__file__).resolve().parent
+    for cand in (here / name, here / "data" / name, here / "docs" / name):
+        try:
+            if cand.is_file():
+                return cand
+        except OSError:
+            continue
+    return None
+
+
 def load_item_names():
-    """Load id -> name from item_ids.txt beside this script"""
+    """Load id -> name from item_ids.txt (see _data_file for search order)"""
     if ITEM_NAMES:
         return ITEM_NAMES
-    here = Path(__file__).resolve().parent
-    for cand in (here / "item_ids.txt",):
-        try:
-            with open(cand, "r", encoding="utf-8") as f:
-                for line in f:
-                    line = line.rstrip("\n")
-                    if not line or line.startswith("#"):
-                        continue
-                    parts = line.split("\t")
-                    if len(parts) != 2:
-                        parts = line.split(None, 1)
-                    if len(parts) != 2:
-                        continue
-                    try:
-                        ITEM_NAMES[int(parts[0])] = parts[1].strip()
-                    except ValueError:
-                        continue
-            break
-        except FileNotFoundError:
-            continue
+    cand = _data_file("item_ids.txt")
+    if cand is None:
+        return ITEM_NAMES
+    try:
+        with open(cand, "r", encoding="utf-8") as f:
+            for line in f:
+                line = line.rstrip("\n")
+                if not line or line.startswith("#"):
+                    continue
+                parts = line.split("\t")
+                if len(parts) != 2:
+                    parts = line.split(None, 1)
+                if len(parts) != 2:
+                    continue
+                try:
+                    ITEM_NAMES[int(parts[0])] = parts[1].strip()
+                except ValueError:
+                    continue
+    except OSError:
+        pass
     return ITEM_NAMES
 
 
@@ -1445,18 +1466,21 @@ SLOT_DB = {}
 
 
 def load_slot_db():
-    """slot -> [(id, name)] from items_by_slot.json (optional)"""
+    """slot -> [(id, name)] from items_by_slot.json (optional)
+
+    See _data_file for the search order.
+    """
     if SLOT_DB:
         return SLOT_DB
-    here = Path(__file__).resolve().parent
-    for cand in (here / "items_by_slot.json",):
-        try:
-            raw = json.loads(cand.read_text(encoding="utf-8"))
-        except (FileNotFoundError, json.JSONDecodeError):
-            continue
-        for slot, lst in raw.items():
-            SLOT_DB[slot] = [(e["id"], e["name"]) for e in lst]
-        break
+    cand = _data_file("items_by_slot.json")
+    if cand is None:
+        return SLOT_DB
+    try:
+        raw = json.loads(cand.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return SLOT_DB
+    for slot, lst in raw.items():
+        SLOT_DB[slot] = [(e["id"], e["name"]) for e in lst]
     return SLOT_DB
 
 
@@ -1867,9 +1891,19 @@ def _confirm_bak(stdscr, bak):
             return opts[sel][0]
 
 
-def _pick_save(stdscr):
+# Returned by the editor when the user presses "back" at the file root.
+# The file list is just the level above an open file, so backing out of the
+# root means "show me the list again", not "there is nowhere to go".
+_BACK_TO_LIST = object()
+
+
+def _pick_save(stdscr, state=None):
     """Curses file picker. Shows the main save dir first; the last row scans
-    every candidate folder. Returns a Path, or None if cancelled."""
+    every candidate folder. Returns a Path, or None if cancelled.
+
+    `state` is a dict carried across visits so returning here from a file
+    lands on the same row instead of resetting to the top.
+    """
     import curses
 
     dirs = _candidate_dirs()
@@ -1896,10 +1930,11 @@ def _pick_save(stdscr):
         except Exception:
             pass
 
-    selected = 0
-    scroll = 0
-    by_name = False
-    scope_all = False
+    state = state if state is not None else {}
+    selected = state.get("selected", 0)
+    scroll = state.get("scroll", 0)
+    by_name = state.get("by_name", False)
+    scope_all = state.get("scope_all", False)
     filter_text = ""
     filter_prompt = False
     filter_buffer = ""
@@ -2101,16 +2136,27 @@ def _pick_save(stdscr):
             if _is_bak(chosen):
                 action = _confirm_bak(stdscr, chosen)
                 if action == "edit":
+                    state.update(selected=selected, scroll=scroll,
+                                 by_name=by_name, scope_all=scope_all)
                     return chosen
                 if action == "restore":
                     ok, msg = _restore_bak(chosen)
                     status = msg
                 continue
+            state.update(selected=selected, scroll=scroll,
+                         by_name=by_name, scope_all=scope_all)
             return chosen
 
 
 def cmd_edit(args):
-    """Interactive TUI editor (curses). With no file, opens a picker"""
+    """Interactive TUI editor (curses). With no file, opens the file picker
+
+    The list and the editor are two levels of one navigation model: backing
+    out of a file's root returns to the list, so you can move between saves
+    without quitting. The two curses.wrapper calls stay separate so that a
+    file which fails to load reports an ordinary error rather than leaving a
+    half-initialised screen behind.
+    """
     try:
         import curses
     except ImportError:
@@ -2123,39 +2169,49 @@ def cmd_edit(args):
                   file=sys.stderr)
         sys.exit(1)
 
-    if args.file:
-        path = Path(args.file)
-    else:
-        # No file named: offer the save dirs instead of erroring out.
-        if not _candidate_dirs():
-            _report_no_save_dir()
-            sys.exit(1)
-        if not (sys.stdin.isatty() and sys.stdout.isatty()):
-            print("Error: the file picker needs an interactive terminal.",
-                  file=sys.stderr)
-            print("       name a file instead:  edit /path/to/M7.mdrgslot",
-                  file=sys.stderr)
-            sys.exit(1)
-        path = curses.wrapper(_pick_save)
-        if path is None:
-            sys.exit(0)          # cancelled, or nothing to show
+    chosen = Path(args.file) if args.file else None
+    picker_state = {}          # survives a round trip through the editor
 
-    data = load_data(path)
-    edit_data = data
-    if file_type(path.name) == "old_save":
-        records = analysis_records(path, data)
-        if not records:
-            print(f"Error: {path.name} has no embedded gameplay data", file=sys.stderr)
-            sys.exit(1)
-        if len(records) > 1:
-            print(f"Error: {path.name} contains multiple saves; edit is not "
-                  f"ambiguous-safe", file=sys.stderr)
-            sys.exit(1)
-        edit_data = records[0]
-    try:
-        curses.wrapper(_interactive_edit, edit_data, path, data)
-    except KeyboardInterrupt:
-        pass
+    while True:
+        if chosen is None:
+            # Level 0: choose a file.
+            if not _candidate_dirs():
+                _report_no_save_dir()
+                sys.exit(1)
+            if not (sys.stdin.isatty() and sys.stdout.isatty()):
+                print("Error: the file picker needs an interactive terminal.",
+                      file=sys.stderr)
+                print("       name a file instead:  edit /path/to/M7.mdrgslot",
+                      file=sys.stderr)
+                sys.exit(1)
+            chosen = curses.wrapper(_pick_save, picker_state)
+            if chosen is None:
+                sys.exit(0)        # cancelled at the list
+
+        # Level 1 and deeper: the file itself.
+        data = load_data(chosen)
+        edit_data = data
+        if file_type(chosen.name) == "old_save":
+            records = analysis_records(chosen, data)
+            if not records:
+                print(f"Error: {chosen.name} has no embedded gameplay data",
+                      file=sys.stderr)
+                sys.exit(1)
+            if len(records) > 1:
+                print(f"Error: {chosen.name} contains multiple saves; edit is "
+                      f"not ambiguous-safe", file=sys.stderr)
+                sys.exit(1)
+            edit_data = records[0]
+
+        try:
+            result = curses.wrapper(_interactive_edit, edit_data, chosen, data)
+        except KeyboardInterrupt:
+            return
+
+        if result is _BACK_TO_LIST:
+            chosen = None          # up one level: back to the list
+            continue
+        return
 
 
 def _interactive_edit(stdscr, data, path, save_root=None):
@@ -2895,8 +2951,12 @@ def _interactive_edit(stdscr, data, path, save_root=None):
                 current_path_str = path_str
                 selected = sel
                 scroll = max(0, selected - 3)
+            elif saved_flag and not quit_confirm:
+                quit_confirm = True
+                status_msg = ("UNSAVED CHANGES - back again to leave anyway, "
+                              "o to save")
             else:
-                status_msg = "already at root (use q to quit)"
+                return _BACK_TO_LIST
         elif key in (ord("q"), ord("Q")):
             if edit_mode:
                 edit_mode = False
@@ -2929,7 +2989,11 @@ def _interactive_edit(stdscr, data, path, save_root=None):
                 selected = sel
                 scroll = max(0, selected - 3)
             else:
-                status_msg = "at root - press q or o"
+                # Deliberately does NOT go up a level. Arrow keys arrive as
+                # ESC + '[' + letter, so a split read yields a bare ESC; if
+                # that navigated, a stray arrow press would bounce you out of
+                # the file. Use `a` or the left arrow to go back.
+                status_msg = "at root - 'a' or left arrow goes back, q quits"
 
 
 def select_items(data, selector):
