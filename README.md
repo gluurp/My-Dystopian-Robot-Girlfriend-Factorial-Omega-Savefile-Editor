@@ -1,10 +1,10 @@
 # MDRG Save File Editor
 
-A cross-platform command-line save editor for My Dystopian Robot Girlfriend (Factorial Omega)
+A cross-platform command-line save editor for My Dystopian Robot Girlfriend (ΩFactorial Omega)
 
 
 Standard library only — no dependencies for editing. Works on Linux, Windows
-and macOS.
+and macOS. (hopefully)
 
 ## Quick start
 
