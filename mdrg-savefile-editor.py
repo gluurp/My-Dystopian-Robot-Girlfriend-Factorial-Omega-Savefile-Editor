@@ -36,16 +36,6 @@ import datetime
 from pathlib import Path
 from collections import Counter
 
-# ── Platform / console compatibility ─────────────────────────────────────────
-#
-# Windows notes:
-#   * Saves use bare LF and no BOM. Opening files for write without
-#     newline="\n" would rewrite every line ending as CRLF on Windows, which
-#     changes the file. All writes therefore pass newline="\n".
-#   * The classic Windows console (cp437/cp1252) cannot encode box-drawing
-#     characters, so every glyph used in output is chosen at runtime.
-#   * `curses` is not in the Windows stdlib; `pip install windows-curses`
-#     supplies it. See cmd_edit.
 
 IS_WINDOWS = sys.platform.startswith("win")
 IS_MAC = sys.platform == "darwin"
@@ -89,24 +79,25 @@ H_LINE = BULLET = ARROW = DASH = CHECK = CROSS = UP = DN = LEFT = RIGHT = ""
 def set_ascii_mode(force_ascii=False):
     """(Re)choose the output glyph set. Called again once args are parsed"""
     global _UNI, H_LINE, BULLET, ARROW, DASH, CHECK, CROSS, UP, DN, LEFT, RIGHT
-    _UNI = False if force_ascii else _console_is_unicode()
-    H_LINE = "─" if _UNI else "-"
-    BULLET = "►" if _UNI else ">"
-    ARROW = "→" if _UNI else "->"
-    DASH = "—" if _UNI else "-"
-    CHECK = "✓" if _UNI else "OK"
-    CROSS = "✗" if _UNI else "!"
-    UP = "↑" if _UNI else "^"
-    DN = "↓" if _UNI else "v"
-    LEFT = "←" if _UNI else "<"
-    RIGHT = "→" if _UNI else ">"
+    _UNI    = False if force_ascii else _console_is_unicode()
+    H_LINE  = "─" if _UNI else "-"
+    BULLET  = "►" if _UNI else ">"
+    ARROW   = "→" if _UNI else "->"
+    DASH    = "—" if _UNI else "-"
+    CHECK   = "✓" if _UNI else "OK"
+    CROSS   = "✗" if _UNI else "!"
+    UP      = "↑" if _UNI else "^"
+    DN      = "↓" if _UNI else "v"
+    LEFT    = "←" if _UNI else "<"
+    RIGHT   = "→" if _UNI else ">"
+
 
 
 set_ascii_mode()
 
 
 def safe_print(*args, **kwargs):
-    """print() that degrades gracefully on a non-UTF8 console."""
+    """print() that degrades gracefully on a non-UTF-8 console"""
     try:
         print(*args, **kwargs)
     except UnicodeEncodeError:
@@ -116,261 +107,251 @@ def safe_print(*args, **kwargs):
         print(*cleaned, **kwargs)
 
 
-
-# ── Human-readable field labels ──────────────────────────────────────────────
-
 LABELS = {
-    # Top-level stats
-    "money": "Cash on hand",
-    "casinoTokens": "Casino tokens",
-    "playerName": "Player name",
-    "botName": "Bot name",
-    "_stamina": "Stamina (0-1)",
-    "_satiation": "Satiation / hunger (0-1)",
-    "_health": "General health (0-1)",
-    "_mentalHealth": "Mental health (0-1)",
-    "_mentalHealthTemporary": "Mental health (temporary mod)",
-    "_lust": "Lust",
-    "_longing": "Longing",
-    "_currentHorniness": "Current horniness",
-    "_sympathy": "Sympathy",
-    "_mood": "Mood (0-1)",
-    "inteligence": "Intelligence (misspelled in-game)",
-    "weeklyRent": "Weekly rent",
-    "subs": "Twitch subscribers",
-    "followers": "Twitch followers",
-    "nunPoints": "Nun interaction points",
-    "priestBotPoints": "Priest-bot interaction points",
-    "search": "Search parameter",
-    "ingameTime": "In-game time (seconds)",
-    "lastWorkedAtDay": "Last worked at day",
-    "timesWentToChurch": "Church visits",
-    "stage": "Story stage",
-    "time": "In-game time (seconds)",
-    "streamCount": "Total streams done",
-    "streamedFor": "Total seconds streamed",
-    "moneyEarnedFromDonations": "Cumulative donation income",
-    "longestStream": "Longest single stream (sec)",
-    "timesCameInside": "Times came (internal)",
-    "timesCameInsideAnal": "Times came (anal)",
-    "timesCameThighjob": "Times came (thighjob)",
-    "timesCameOutside": "Times came (external)",
-    "timesCameInMouth": "Times came (oral)",
-    "mlCameInMouth": "ml came (oral)",
-    "mlCameInVagina": "ml came (vaginal)",
-    "mlCameInAss": "ml came (anal)",
-    "mlCameFromThighjob": "ml came (thighjob)",
-    "mlCameOutside": "ml came (external)",
-    "mlOfCumWasted": "ml cum wasted",
-    "timesLostChess": "Chess losses",
-    "timesWonChess": "Chess wins",
-    "timesLostOldMaid": "Old Maid losses",
-    "timesWonOldMaid": "Old Maid wins",
-    "timesRanAwayOldMaid": "Old Maid — ran away",
-    "timesLostWordChain": "Word Chain losses",
-    "timesWonWordChain": "Word Chain wins",
-    "lightSwitchOn": "Main light on",
-    "bathroomLightOn": "Bathroom light on",
-    "statusText": "UI status text",
-    "lastSleptWithBot": "Last slept with bot",
-    "lastWokeUpAt": "Last woke up (in-game time)",
-    "lastFuckedAt": "Last fuck (in-game time)",
-    "lastBotCameAt": "Last bot came (in-game time)",
-    "lastInteractAt": "Last interact (in-game time)",
-    "lastEquipmentAt": "Last equipment change (in-game time)",
-    "lastOutsideWithBotAt": "Last walk w/ bot (in-game time)",
-    "lastStreamedAt": "Last streamed (in-game time)",
-    "lastTalkedAt": "Last talked (in-game time)",
-    "lastBotStartedTalkAt": "Last bot talk start (in-game time)",
-    "lastHeadpatedAt": "Last headpat (in-game time)",
-    "lastAnonsShowerAt": "Last anon shower (in-game time)",
-    "leastBotCleanAt": "Last bot clean (in-game time)",
-    "lastHungerInfoAt": "Last hunger update (in-game time)",
-    "lastMentalHealthInfoAt": "Last mental health update (in-game time)",
-    "_uniqueConversationsLeft": "Unique conversations left",
-    "lastWentToChurchAt": "Last church (in-game time)",
-    "lastCuddledAt": "Last cuddle (in-game time)",
-    "vinegaraEffectEnd": "Vinegar effect end (in-game time)",
-    "deathGripEffectEnd": "Death grip effect end (in-game time)",
-    "_maxCum": "Max cum capacity",
-    "_remainingCum": "Current cum amount",
-    "presetColors": "Preset colors",
-    "_saveType": "Save type (0=manual, 1=auto)",
-    "slot": "Slot index",
-    "_time": "Timestamp (FILETIME, 100ns since 1601)",
-    "notes": "Player notes",
-    "description": "Description",
-    "savedata": "Saved data (inline JSON, old format)",
-    "nextAutoSaveIndex": "Next auto-slot index",
-    "storyTextIds_Comp": "Seen story text IDs (base64+deflate+binary)",
-    "visitedWebsites": "Visited websites",
-    "achievements": "Achievements",
-    "flags": "Flags",
-    "saves": "Manual save slots",
-    "autoSaves": "Auto-save slots",
-    "data": "PlayerPrefs data",
-    "Key": "Pref key",
-    "Value": "Pref value",
-    # Manager keys
-    "stockManager": "Stock market manager",
-    "itemManager": "Inventory / shop manager",
-    "eventManager": "Active events",
-    "cockTwitchManager": "Twitch streaming manager",
-    "cocktractManager": "Contracts / dating manager",
-    "deliveryManager": "Package deliveries",
-    "cookingMinigameManager": "Cooking minigame",
-    "fishingMinigameManager": "Fishing minigame",
-    "botStatusAppManager": "Bot status console",
-    "joinUsBlogManager": "Join Us blog",
-    "customData": "Custom data (I=int, F=float, S=string)",
-    "newsDataManager": "News system",
-    "dialogueChainData": "Dialogue tracking",
-    "botLive2DCommonState": "Bot Live2D state",
-    "emails": "Inbox emails",
-    "serializedEmails": "Serialized emails",
-    "_allEmails": "All emails generated",
-    "gameVersion": "Game version",
-    "sets": "Outfit sets",
-    "nunRepairOrders": "Nun repair orders",
-    "clothierOrders": "Clothier orders",
-    "items": "Inventory items",
-    "shopManager": "Shop data",
-    "_events": "Active events list",
-    "_streamers": "Twitch streamers",
-    "followerMemorySerialize": "Follower memory",
-    "AvailableContracts": "Available contracts",
-    "CurrentContracts": "Active contracts",
-    "PastContracts": "Past contracts",
-    "globalRespect": "Global respect",
-    "<CocktractPartners>k__BackingField": "Cocktract partners",
-    "<Deliveries>k__BackingField": "Deliveries",
-    "_serializedSaves": "Fishing saves",
-    "_fishingTipSeed": "Fishing tip seed",
-    "_consoleStyle": "Console style",
-    "_blogSaves": "Blog saves",
-    "<StockCompanies>k__BackingField": "Stock companies",
-    "<ignored>k__BackingField": "Ignored entries",
-    "ignoredGameIds": "Ignored game IDs",
-    "mainNews": "Main news slot",
-    "sideNews1": "Side news slot 1",
-    "sideNews2": "Side news slot 2",
-    "sideNews3": "Side news slot 3",
-    "opinionNews": "Opinion news slot",
-    "CumOutsideData": "Cum outside data",
-    "_cumInsideVaginaPercent": "Cum inside vagina %",
-    "_cumInsideWombPercent": "Cum inside womb %",
-    "_cumInsideAnalPercent": "Cum inside anal %",
-    "_cumInMouthPercent": "Cum in mouth %",
-    "_cumInsideStomachPercent": "Cum inside stomach %",
-    "frickData": "Frick (sexual) state data",
-    "S_TargetCumBarValue": "Target cum bar",
-    "S_CurrentCumBarValue": "Current cum bar",
-    "S_IsCockOut": "Cock out",
-    "S_IsFlaccid": "Flaccid",
-    "S_IsPantsAside": "Pants aside",
-    "D_HasSaidStartFrickConversation": "Said start frick convo",
-    "D_BotLeadStatus": "Bot lead status",
-    "D_TimesBotCame": "Times bot came",
-    "D_TimesAnonCame": "Times anon came",
-    "D_TimesBeggedToStop": "Times begged to stop",
-    "D_AlreadyInsertedOnce": "Already inserted once",
-    "D_UnzippedPantsAlready": "Unzipped pants already",
-    "D_HadToSlowDown": "Had to slow down",
-    "D_HadToStop": "Had to stop",
-    "D_EdgedForThrusts": "Edged for thrusts",
-    "D_CurrentOnCum": "Current on cum",
-    "D_ContinueAfterCumming": "Continue after cumming",
-    "D_Edge": "Edge",
-    "read": "Read",
-    "visibleAt": "Visible at (in-game time)",
-    "onReadEventHolder": "On-read event",
-    "emailId": "Email ID",
-    "specialValues": "Special values",
-    "<Name>k__BackingField": "Name",
-    "<EarliestHour>k__BackingField": "Stream start hour",
-    "<LatestHour>k__BackingField": "Stream end hour",
-    "<Followers>k__BackingField": "Followers",
-    "<Type>k__BackingField": "Stream type",
-    "seed": "Random seed",
-    "<Respect>k__BackingField": "Respect",
-    "<Id>k__BackingField": "ID",
-    "<Unlocked>k__BackingField": "Unlocked",
-    "specialData": "Special data",
-    "<TrackingNumber>k__BackingField": "Tracking number",
-    "<DeliveryItems>k__BackingField": "Delivery items",
-    "<SentTime>k__BackingField": "Sent at (in-game time)",
-    "<DeliveryDuration>k__BackingField": "Duration",
-    "<PremiumDeliveryBought>k__BackingField": "Premium delivery",
-    "<Sender>k__BackingField": "Sender",
-    "<MoneySpent>k__BackingField": "Money spent",
-    "<ItemsBought>k__BackingField": "Items bought",
-    "_shopItems": "Shop items",
-    "_rngCompensationData": "RNG compensation",
-    "name": "Flag name",
-    "timeAdded": "Time added (in-game)",
-    "firstTimeAdded": "First time added (in-game)",
-    "times": "Occurrence count",
-    "newsId": "News ID (-1=none)",
-    "gameId": "Game ID",
-    "newsSeed": "News seed",
-    "TextColor": "Text color",
-    "BackgroundColor": "Background color",
-    "_serialized": "Serialized data",
-    "EquippedItems": "Equipped items",
-    "UsedMods": "Used mods",
-    "Name": "Set name",
-    "count": "Count",
-    "quality": "Quality",
-    "IsFavourite": "Favourite",
-    "_id": "Template ID",
-    "_gameId": "Game definition ID",
-    "_additionalData": "Additional data",
-    "AdditionalDataSlots": "Additional data slots",
-    "UniqueItemGuid": "Unique GUID",
-    "SourceItemsUniqueGuids": "Source GUIDs",
-    "_equipedSlot": "Equipped slot",
-    "itemLocation": "Item location",
-    "_colors": "Colors",
-    "DI": "Dynamic int",
-    "IM": "Item manager",
-    "I": "Int list",
-    "F": "Float list",
-    "S": "String list",
-    "_s": "Save entries",
-    "arguments": "Arguments",
-    "<Seen>k__BackingField": "Seen",
-    "<IsGold>k__BackingField": "Is gold contract",
-    "_partnerId": "Partner ID",
-    "_requirement": "Requirement",
-    "<AcceptBonusReward>k__BackingField": "Accept bonus reward",
-    "<SuccessReward>k__BackingField": "Success reward",
-    "<FailureReward>k__BackingField": "Failure reward",
-    "<Status>k__BackingField": "Status",
-    "<CreatedTime>k__BackingField": "Created at",
-    "<TimeLimitForAccepting>k__BackingField": "Time to accept",
-    "<AcceptedTime>k__BackingField": "Accepted at",
-    "<FinishedTime>k__BackingField": "Finished at",
-    "OwnedStocksCount": "Owned stocks count",
-    "OwnedStocksCost": "Owned stocks cost",
-    "<TargetPrice>k__BackingField": "Target price",
-    "priceMemorySerialize": "Price history",
-    "<Instability>k__BackingField": "Price instability",
-    "<MinPrice>k__BackingField": "Min price",
-    "replacement": "Replacement",
+    "<AcceptBonusReward>k__BackingField":       "Accept bonus reward",
+    "<AcceptedTime>k__BackingField":             "Accepted at",
+    "<CocktractPartners>k__BackingField":        "Cocktract partners",
+    "<CreatedTime>k__BackingField":              "Created at",
+    "<Deliveries>k__BackingField":               "Deliveries",
+    "<DeliveryDuration>k__BackingField":         "Duration",
+    "<DeliveryItems>k__BackingField":            "Delivery items",
+    "<EarliestHour>k__BackingField":             "Stream start hour",
+    "<FailureReward>k__BackingField":            "Failure reward",
+    "<FinishedTime>k__BackingField":             "Finished at",
+    "<Followers>k__BackingField":                "Followers",
+    "<Id>k__BackingField":                       "ID",
+    "<Instability>k__BackingField":              "Price instability",
+    "<IsGold>k__BackingField":                   "Is gold contract",
+    "<ItemsBought>k__BackingField":              "Items bought",
+    "<LatestHour>k__BackingField":               "Stream end hour",
+    "<MinPrice>k__BackingField":                 "Min price",
+    "<MoneySpent>k__BackingField":               "Money spent",
+    "<Name>k__BackingField":                     "Name",
+    "<PremiumDeliveryBought>k__BackingField":    "Premium delivery",
+    "<Respect>k__BackingField":                  "Respect",
+    "<Seen>k__BackingField":                     "Seen",
+    "<Sender>k__BackingField":                   "Sender",
+    "<SentTime>k__BackingField":                 "Sent at",
+    "<Status>k__BackingField":                   "Status",
+    "<StockCompanies>k__BackingField":           "Stock companies",
+    "<SuccessReward>k__BackingField":            "Success reward",
+    "<TargetPrice>k__BackingField":              "Target price",
+    "<TimeLimitForAccepting>k__BackingField":    "Time to accept",
+    "<TrackingNumber>k__BackingField":           "Tracking number",
+    "<Type>k__BackingField":                     "Stream type",
+    "<Unlocked>k__BackingField":                 "Unlocked",
+    "<ignored>k__BackingField":                  "Ignored entries",
+    "AdditionalDataSlots":                       "Additional data slots",
+    "AvailableContracts":                        "Available contracts",
+    "BackgroundColor":                           "Background color",
+    "CumOutsideData":                            "Cum outside data",
+    "CurrentContracts":                          "Active contracts",
+    "DI":                                        "Dynamic int",
+    "D_AlreadyInsertedOnce":                     "Already inserted once",
+    "D_BotLeadStatus":                           "Bot lead status",
+    "D_ContinueAfterCumming":                    "Continue after cumming",
+    "D_CurrentOnCum":                            "Current on cum",
+    "D_Edge":                                    "Edge",
+    "D_EdgedForThrusts":                         "Edged for thrusts",
+    "D_HadToSlowDown":                           "Had to slow down",
+    "D_HadToStop":                               "Had to stop",
+    "D_HasSaidStartFrickConversation":           "Said start frick convo",
+    "D_TimesAnonCame":                           "Times anon came",
+    "D_TimesBeggedToStop":                       "Times begged to stop",
+    "D_TimesBotCame":                            "Times bot came",
+    "D_UnzippedPantsAlready":                    "Unzipped pants already",
+    "EquippedItems":                             "Equipped items",
+    "F":                                         "Float list",
+    "I":                                         "Int list",
+    "IM":                                        "Item manager",
+    "IsFavourite":                               "Favourite",
+    "Key":                                       "Pref key",
+    "Name":                                      "Set name",
+    "OwnedStocksCost":                           "Owned stocks cost",
+    "OwnedStocksCount":                          "Owned stocks count",
+    "PastContracts":                             "Past contracts",
+    "S":                                         "String list",
+    "S_CurrentCumBarValue":                      "Current cum bar",
+    "S_IsCockOut":                               "Cock out",
+    "S_IsFlaccid":                               "Flaccid",
+    "S_IsPantsAside":                            "Pants aside",
+    "S_TargetCumBarValue":                       "Target cum bar",
+    "SourceItemsUniqueGuids":                    "Source GUIDs",
+    "TextColor":                                 "Text color",
+    "UniqueItemGuid":                            "Unique GUID",
+    "UsedMods":                                  "Used mods",
+    "Value":                                     "Pref value",
+    "_additionalData":                           "Additional data",
+    "_allEmails":                                "All emails generated",
+    "_blogSaves":                                "Blog saves",
+    "_colors":                                   "Colors",
+    "_consoleStyle":                             "Console style",
+    "_cumInMouthPercent":                        "Cum in mouth %",
+    "_cumInsideAnalPercent":                     "Cum inside anal %",
+    "_cumInsideStomachPercent":                  "Cum inside stomach %",
+    "_cumInsideVaginaPercent":                   "Cum inside vagina %",
+    "_cumInsideWombPercent":                     "Cum inside womb %",
+    "_currentHorniness":                         "Current horniness",
+    "_equipedSlot":                              "Equipped slot",
+    "_events":                                   "Active events list",
+    "_fishingTipSeed":                           "Fishing tip seed",
+    "_gameId":                                   "Game definition ID",
+    "_health":                                   "Health",
+    "_id":                                       "Template ID",
+    "_longing":                                  "Longing",
+    "_lust":                                     "Lust",
+    "_maxCum":                                   "Max cum capacity",
+    "_mentalHealth":                             "Mental health",
+    "_mentalHealthTemporary":                    "Mental health (temporary)",
+    "_mood":                                     "Mood",
+    "_partnerId":                                "Partner ID",
+    "_remainingCum":                             "Current cum amount",
+    "_requirement":                              "Requirement",
+    "_rngCompensationData":                      "RNG compensation",
+    "_s":                                        "Save entries",
+    "_satiation":                                "Satiation",
+    "_saveType":                                 "Save type",
+    "_serialized":                               "Serialized data",
+    "_serializedSaves":                          "Fishing saves",
+    "_shopItems":                                "Shop items",
+    "_stamina":                                  "Stamina",
+    "_streamers":                                "Twitch streamers",
+    "_sympathy":                                 "Sympathy",
+    "_time":                                     "Timestamp",
+    "_uniqueConversationsLeft":                  "Unique conversations left",
+    "achievements":                              "Achievements",
+    "arguments":                                 "Arguments",
+    "autoSaves":                                 "Auto-save slots",
+    "bathroomLightOn":                           "Bathroom light on",
+    "botLive2DCommonState":                      "Bot Live2D state",
+    "botName":                                   "Bot name",
+    "botStatusAppManager":                       "Bot status console",
+    "casinoTokens":                              "Casino tokens",
+    "clothierOrders":                            "Clothier orders",
+    "cockTwitchManager":                         "Twitch streaming manager",
+    "cocktractManager":                          "Contracts / dating manager",
+    "cookingMinigameManager":                    "Cooking minigame",
+    "count":                                     "Count",
+    "customData":                                "Custom data",
+    "data":                                      "PlayerPrefs data",
+    "deathGripEffectEnd":                        "Death grip effect end",
+    "deliveryManager":                           "Package deliveries",
+    "description":                               "Description",
+    "dialogueChainData":                         "Dialogue tracking",
+    "emailId":                                   "Email ID",
+    "emails":                                    "Inbox emails",
+    "eventManager":                              "Active events",
+    "firstTimeAdded":                            "First time added",
+    "fishingMinigameManager":                    "Fishing minigame",
+    "flags":                                     "Flags",
+    "followerMemorySerialize":                   "Follower memory",
+    "followers":                                 "Twitch followers",
+    "frickData":                                 "Frick (sexual) state data",
+    "gameId":                                    "Game ID",
+    "gameVersion":                               "Game version",
+    "globalRespect":                             "Global respect",
+    "ignoredGameIds":                            "Ignored game IDs",
+    "ingameTime":                                "In-game time",
+    "inteligence":                               "Inteligence",
+    "itemLocation":                              "Item location",
+    "itemManager":                               "Inventory / shop manager",
+    "items":                                     "Inventory items",
+    "joinUsBlogManager":                         "Join Us blog",
+    "lastAnonsShowerAt":                         "Last anon shower",
+    "lastBotCameAt":                             "Last bot came",
+    "lastBotStartedTalkAt":                      "Last bot talk start",
+    "lastCuddledAt":                             "Last cuddle",
+    "lastEquipmentAt":                           "Last equipment change",
+    "lastFuckedAt":                              "Last fuck",
+    "lastHeadpatedAt":                           "Last headpat",
+    "lastHungerInfoAt":                          "Last hunger update",
+    "lastInteractAt":                            "Last interact",
+    "lastMentalHealthInfoAt":                    "Last mental health update",
+    "lastOutsideWithBotAt":                      "Last walk w/ bot",
+    "lastSleptWithBot":                          "Last slept with bot",
+    "lastStreamedAt":                            "Last streamed",
+    "lastTalkedAt":                              "Last talked",
+    "lastWentToChurchAt":                        "Last church",
+    "lastWokeUpAt":                              "Last woke up",
+    "lastWorkedAtDay":                           "Last worked at day",
+    "leastBotCleanAt":                           "Last bot clean",
+    "lightSwitchOn":                             "Main light on",
+    "longestStream":                             "Longest stream",
+    "mainNews":                                  "Main news slot",
+    "mlCameFromThighjob":                        "ml came thighjob",
+    "mlCameInAss":                               "ml came anal",
+    "mlCameInMouth":                             "ml came oral",
+    "mlCameInVagina":                            "ml came vaginal",
+    "mlCameOutside":                             "ml came outside",
+    "mlOfCumWasted":                             "ml cum wasted",
+    "money":                                     "Money",
+    "moneyEarnedFromDonations":                  "Money earned from donations",
+    "name":                                      "Flag name",
+    "newsDataManager":                           "News system",
+    "newsId":                                    "News ID",
+    "newsSeed":                                  "News seed",
+    "nextAutoSaveIndex":                         "Next auto-slot index",
+    "notes":                                     "Player notes",
+    "nunPoints":                                 "Nun interaction points",
+    "nunRepairOrders":                           "Nun repair orders",
+    "onReadEventHolder":                         "On-read event",
+    "opinionNews":                               "Opinion news slot",
+    "playerName":                                "Player name",
+    "presetColors":                              "Preset colors",
+    "priceMemorySerialize":                      "Price history",
+    "priestBotPoints":                           "Priest-bot interaction points",
+    "quality":                                   "Quality",
+    "read":                                      "Read",
+    "replacement":                               "Replacement",
+    "savedata":                                  "Saved data",
+    "saves":                                     "Manual save slots",
+    "search":                                    "Search",
+    "seed":                                      "Random seed",
+    "serializedEmails":                          "Serialized emails",
+    "sets":                                      "Outfit sets",
+    "shopManager":                               "Shop data",
+    "sideNews1":                                 "Side news slot 1",
+    "sideNews2":                                 "Side news slot 2",
+    "sideNews3":                                 "Side news slot 3",
+    "slot":                                      "Slot",
+    "specialData":                               "Special data",
+    "specialValues":                             "Special values",
+    "stage":                                     "Story stage",
+    "statusText":                                "Status text",
+    "stockManager":                              "Stock market manager",
+    "storyTextIds_Comp":                         "Seen story text IDs",
+    "streamCount":                               "Total streams done",
+    "streamedFor":                               "Total seconds streamed",
+    "subs":                                      "Subscribers",
+    "time":                                      "In-game time",
+    "timeAdded":                                 "Time added",
+    "times":                                     "Times",
+    "timesCameInMouth":                          "Times came",
+    "timesCameInside":                           "Times came",
+    "timesCameInsideAnal":                       "Times came",
+    "timesCameOutside":                          "Times came",
+    "timesCameThighjob":                         "Times came",
+    "timesLostChess":                            "Chess losses",
+    "timesLostOldMaid":                          "Old Maid losses",
+    "timesLostWordChain":                        "Word Chain losses",
+    "timesRanAwayOldMaid":                       "Old Maid — ran away",
+    "timesWentToChurch":                         "Church visits",
+    "timesWonChess":                             "Chess wins",
+    "timesWonOldMaid":                           "Old Maid wins",
+    "timesWonWordChain":                         "Word Chain wins",
+    "vinegaraEffectEnd":                         "Vinegar effect end",
+    "visibleAt":                                 "Visible at",
+    "visitedWebsites":                           "Visited websites",
+    "weeklyRent":                                "Weekly rent",
 }
 
 
-
-# ── Constants ────────────────────────────────────────────────────────
-
-# Unity's Application.persistentDataPath, per platform. The game writes its
-# Saves/ folder under one of these.
 GAME_DIR_NAME = "My Dystopian Robot Girlfriend"
 GAME_COMPANY = "IncontinentCell"
 
 
 def candidate_game_dirs():
-    """Every plausible game data directory on this platform, best first."""
+    """Every plausible game data directory on this platform, best first"""
     home = Path.home()
     out = []
     if IS_WINDOWS:
@@ -410,15 +391,15 @@ def candidate_save_dirs():
 
 
 def resolve_saves_dir(explicit=None, near=None):
-    """Work out which Saves directory to operate on.
+    """Work out which saves directory to operate on
 
     Priority:
-      1. `explicit` argument from the command line.
+      1. `explicit` argument from the command line
       2. `near` - the directory of the file being edited. This guarantees the
          tool always operates on the SAME folder as the file you are working
-         with, even if several installs exist.
-      3. the first existing platform candidate.
-      4. the first platform candidate, so the error message is actionable.
+         with, even if several installs exist
+      3. the first existing platform candidate
+      4. the first platform candidate, so the error message is actionable
     """
     if explicit:
         p = Path(explicit).expanduser()
@@ -440,7 +421,7 @@ def resolve_saves_dir(explicit=None, near=None):
 
 
 def cmd_where(args):
-    """Show which save directories were checked and which one is in use."""
+    """Show which save directories were checked and which one is in use"""
     print(f"platform : {'Windows' if IS_WINDOWS else 'macOS' if IS_MAC else 'Linux/other'}")
     print(f"python   : {sys.version.split()[0]}")
     print(f"unicode  : {'yes' if _UNI else 'no (ASCII fallback)'}")
@@ -469,15 +450,14 @@ def cmd_where(args):
         if os.environ.get(var):
             print(f"  env {var}={os.environ[var]}")
 
+
 SECONDS_PER_DAY = 86400
 SECONDS_PER_HOUR = 3600
 SECONDS_PER_MINUTE = 60
 
 
-# ── Utility functions ────────────────────────────────────────────────────────
-
 def _is_likely_json(path):
-    """Check if a file starts with a JSON opening bracket."""
+    """Check if a file starts with a JSON opening bracket"""
     try:
         with open(path, "rb") as f:
             prefix = f.read(2)
@@ -499,7 +479,7 @@ def load_json(path):
 
 
 def load_data(path):
-    """Load JSON and normalize embedded savedata strings into objects."""
+    """Load JSON and normalize embedded savedata strings into objects"""
     data = load_json(path)
     ft = file_type(path.name)
     if ft in ("registry", "old_save"):
@@ -521,7 +501,7 @@ def load_data(path):
 
 
 def analysis_records(path, data=None):
-    """Return gameplay records, including records embedded in old save files."""
+    """Return gameplay records, including records embedded in old save files"""
     path = Path(path)
     data = data if data is not None else load_data(path)
     ft = file_type(path.name)
@@ -534,7 +514,7 @@ def analysis_records(path, data=None):
 
 
 def format_analysis(path, record):
-    """Build a concise, human-readable summary shared by CLI and GUI."""
+    """Build a concise, human-readable summary shared by CLI and GUI"""
     path = Path(path)
     lines = [f"=== {path.name} ==="]
     if not record:
@@ -550,23 +530,21 @@ def format_analysis(path, record):
         f"Inventory items: {len(record.get('itemManager', {}).get('items', []))}",
         f"Emails: {len(record.get('_allEmails', []))}",
         f"Streams: {num(record.get('streamCount'))} ({num(record.get('streamedFor'))} seconds)",
-        f"Health / mental health: {record.get('_health', '?')} / {record.get('_mentalHealth', '?')}",
+        f"Health / mental health: {record.get('_health', '?')} / "
+        f"{record.get('_mentalHealth', '?')}",
     ])
     return "\n".join(lines)
 
 
 def save_data(path, data):
-    """Save JSON, serializing savedata objects back to strings in registry files.
+    """Save JSON, serializing savedata objects back to strings in registry files
 
-    Order matters: the .bak is taken BEFORE anything is mutated or normalised,
-    so it always contains the exact bytes that were on disk.
+    Order matters: the .bak is taken BEFORE anything is mutated or normalized,
+    so it always contains the exact bytes that were on disk
     """
-    # 1. back up exactly what is on disk, untouched
     bak = backup_file(path)
-
     # 2. normalise ITEM colours only (see normalize_colors for why)
     fixes = normalize_colors(data)
-
     # 3. re-serialise embedded savedata for registry / old formats
     ft = file_type(path.name)
     if ft in ("registry", "old_save"):
@@ -584,7 +562,7 @@ def save_data(path, data):
 
 
 def file_type(path):
-    """Classify a file in the Saves directory."""
+    """Classify a file in the Saves directory"""
     p = Path(path).name
     if p == "save.mdrg":
         return "registry"
@@ -606,7 +584,7 @@ def file_type(path):
 
 
 def ft_to_str(v):
-    """Convert FILETIME ticks to datetime."""
+    """Convert FILETIME ticks to datetime"""
     try:
         return str(datetime.datetime(1601, 1, 1) + datetime.timedelta(microseconds=int(v) // 10))
     except Exception:
@@ -643,10 +621,8 @@ def num(v, default=0):
     return v if v is not None else default
 
 
-# ── Commands ─────────────────────────────────────────────────────────────────
-
 def cmd_scan(args):
-    """Scan a Saves directory and list all files."""
+    """Scan a Saves directory and list all files"""
     directory = resolve_saves_dir(getattr(args, "directory", None))
     if not directory.is_dir():
         print(f"Error: {directory} is not a directory", file=sys.stderr)
@@ -675,7 +651,10 @@ def cmd_scan(args):
                 if ft == "registry":
                     summary = f"keys={list(data.keys())}"
                     if "saves" in data:
-                        summary += f" | saves={len(data['saves'])} autoSaves={len(data.get('autoSaves',[]))}"
+                        summary += (
+                            f" | saves={len(data['saves'])} "
+                            f"autoSaves={len(data.get('autoSaves',[]))}"
+                        )
                         if data["saves"]:
                             first_sd = data["saves"][0].get("savedata")
                             if isinstance(first_sd, dict):
@@ -687,9 +666,18 @@ def cmd_scan(args):
                     if "achievements" in data:
                         summary += f" | achievements={data['achievements'].get('values',[])}"
                 elif ft in ("auto_slot", "manual_slot"):
-                    summary = f"v{data.get('gameVersion','?')} | time={data.get('time','?')} | flags={len(data.get('flags',[]))} | items={len(data.get('itemManager',{}).get('items',[]))}"
+                    summary = (
+                        f"v{data.get('gameVersion','?')} | "
+                        f"time={data.get('time','?')} | "
+                        f"flags={len(data.get('flags',[]))} | "
+                        f"items={len(data.get('itemManager',{}).get('items',[]))}"
+                    )
                     if "subs" in data:
-                        summary += f" | subs={data.get('subs')} followers={data.get('followers')} money={data.get('money')}"
+                        summary += (
+                            f" | subs={data.get('subs')} "
+                            f"followers={data.get('followers')} "
+                            f"money={data.get('money')}"
+                        )
                 elif ft == "old_save":
                     summary = f"keys={list(data.keys())}"
                     if "saves" in data:
@@ -703,7 +691,7 @@ def cmd_scan(args):
 
 
 def cmd_info(args):
-    """Show structure/keys of a file."""
+    """Show structure/keys of a file"""
     path = Path(args.file)
     data = load_data(path)
     ft = file_type(path.name)
@@ -736,7 +724,10 @@ def cmd_info(args):
                     sd_info = f" | savedata_keys={list(sd.keys())[:10]}"
                 elif isinstance(sd, str):
                     sd_info = " | savedata=(unparsed)"
-                print(f"  slot {s.get('slot')}: _time={ft_to_str(s.get('_time'))} ingame={s.get('ingameTime')} type={s.get('_saveType')}{sd_info}")
+                print(f"  slot {s.get('slot')}: "
+                      f"_time={ft_to_str(s.get('_time'))} "
+                      f"ingame={s.get('ingameTime')} "
+                      f"type={s.get('_saveType')}{sd_info}")
         if "autoSaves" in data:
             print("Auto-saves:")
             for s in data["autoSaves"]:
@@ -746,7 +737,10 @@ def cmd_info(args):
                     sd_info = f" | savedata_keys={list(sd.keys())[:10]}"
                 elif isinstance(sd, str):
                     sd_info = " | savedata=(unparsed)"
-                print(f"  slot {s.get('slot')}: _time={ft_to_str(s.get('_time'))} ingame={s.get('ingameTime')} type={s.get('_saveType')}{sd_info}")
+                print(f"  slot {s.get('slot')}: "
+                      f"_time={ft_to_str(s.get('_time'))} "
+                      f"ingame={s.get('ingameTime')} "
+                      f"type={s.get('_saveType')}{sd_info}")
 
     elif ft in ("auto_slot", "manual_slot"):
         print("Top-level keys (scalar values shown):")
@@ -760,7 +754,11 @@ def cmd_info(args):
         print()
         print("Managers present:")
         for k in data:
-            if isinstance(data[k], dict) and k not in ("_allEmails", "newsDataManager", "dialogueChainData", "shopManager", "botLive2DCommonState"):
+            EXCLUDED = (
+                "_allEmails", "newsDataManager", "dialogueChainData",
+                "shopManager", "botLive2DCommonState",
+            )
+            if isinstance(data[k], dict) and k not in EXCLUDED:
                 print(f"  {k}")
 
     elif ft == "old_save":
@@ -789,7 +787,7 @@ def cmd_info(args):
 
 
 def cmd_stats(args):
-    """Show key stats from a slot file."""
+    """Show key stats from a slot file"""
     path = Path(args.file)
     data = load_data(path)
     ft = file_type(path.name)
@@ -804,7 +802,8 @@ def cmd_stats(args):
     print(f"  Player:          {d.get('playerName')}")
     print(f"  Bot:             {d.get('botName')}")
     print(f"  Story stage:     {d.get('stage')}")
-    print(f"  In-game time:    {d.get('time')} ({ingame_time_str(d.get('time'))})")
+    print(f"  In-game time:    {d.get('time')} "
+          f"({ingame_time_str(d.get('time'))})")
     print(f"  Money:           {num(d.get('money')):,}")
     print(f"  Subs:            {d.get('subs')}")
     print(f"  Followers:       {d.get('followers')}")
@@ -819,26 +818,46 @@ def cmd_stats(args):
     print(f"  Nun points:      {num(d.get('nunPoints'))}")
     print()
     print("--- Core Stats ---")
-    for k in ["_stamina","_satiation","_health","_mentalHealth","_mentalHealthTemporary","_lust","_longing","_currentHorniness","_sympathy","_mood","_maxCum","_remainingCum","inteligence","search"]:
+    CORE_STATS = [
+        "_stamina", "_satiation", "_health", "_mentalHealth",
+        "_mentalHealthTemporary", "_lust", "_longing",
+        "_currentHorniness", "_sympathy", "_mood", "_maxCum",
+        "_remainingCum", "inteligence", "search",
+    ]
+    for k in CORE_STATS:
         v = d.get(k)
         if v is not None:
             print(f"  {label_for(k):<30} {v}")
     print()
     print("--- Timestamps (in-game) ---")
-    for k in ["lastWokeUpAt","lastFuckedAt","lastBotCameAt","lastInteractAt","lastEquipmentAt","lastOutsideWithBotAt","lastStreamedAt","lastTalkedAt","lastBotStartedTalkAt","lastHeadpatedAt","lastAnonsShowerAt","leastBotCleanAt","lastHungerInfoAt","lastMentalHealthInfoAt","lastWentToChurchAt","lastCuddledAt","lastWorkedAtDay"]:
+    TIMESTAMP_KEYS = [
+        "lastWokeUpAt", "lastFuckedAt", "lastBotCameAt",
+        "lastInteractAt", "lastEquipmentAt", "lastOutsideWithBotAt",
+        "lastStreamedAt", "lastTalkedAt", "lastBotStartedTalkAt",
+        "lastHeadpatedAt", "lastAnonsShowerAt", "leastBotCleanAt",
+        "lastHungerInfoAt", "lastMentalHealthInfoAt",
+        "lastWentToChurchAt", "lastCuddledAt", "lastWorkedAtDay",
+    ]
+    for k in TIMESTAMP_KEYS:
         v = d.get(k)
         if v is not None and v != 0:
             print(f"  {label_for(k):<30} {v} ({ingame_time_str(v)})")
     print()
     print("--- Sexual Stats ---")
-    for k in ["timesCameInside","timesCameInsideAnal","timesCameThighjob","timesCameOutside","timesCameInMouth","mlCameInMouth","mlCameInVagina","mlCameInAss","mlCameFromThighjob","mlCameOutside","mlOfCumWasted"]:
+    SEXUAL_KEYS = [
+        "timesCameInside", "timesCameInsideAnal", "timesCameThighjob",
+        "timesCameOutside", "timesCameInMouth", "mlCameInMouth",
+        "mlCameInVagina", "mlCameInAss", "mlCameFromThighjob",
+        "mlCameOutside", "mlOfCumWasted",
+    ]
+    for k in SEXUAL_KEYS:
         v = d.get(k)
         if v is not None and v != 0:
             print(f"  {label_for(k):<30} {v}")
 
 
 def cmd_analyze(args):
-    """Analyze one or more save files using the shared normalized format."""
+    """Analyze one or more save files using the shared normalized format"""
     results = []
     for name in args.files:
         path = Path(name)
@@ -911,7 +930,7 @@ def cmd_gui(args):
 
 
 def cmd_flags(args):
-    """List all flags from a slot file."""
+    """List all flags from a slot file"""
     path = Path(args.file)
     data = load_json(path)
     flags = data.get("flags", [])
@@ -928,7 +947,7 @@ def cmd_flags(args):
 
 
 def cmd_emails(args):
-    """List emails from a slot file."""
+    """List emails from a slot file"""
     path = Path(args.file)
     data = load_json(path)
     emails = data.get("_allEmails", [])
@@ -945,7 +964,11 @@ def cmd_emails(args):
     if args.detail:
         print("\nAll emails:")
         for i, e in enumerate(emails):
-            print(f"\n  [{i}] {e.get('emailId')} read={e.get('read')} visibleAt={e.get('visibleAt')}")
+            print(
+                f"\n  [{i}] {e.get('emailId')} "
+                f"read={e.get('read')} "
+                f"visibleAt={e.get('visibleAt')}"
+            )
             if e.get("specialValues"):
                 print(f"      specialValues: {e['specialValues']}")
             eh = e.get("onReadEventHolder", {})
@@ -954,7 +977,7 @@ def cmd_emails(args):
 
 
 def cmd_items(args):
-    """List items from a slot file, resolving names via the ItemEnum table."""
+    """List items from a slot file, resolving names via the ItemEnum table"""
     path = Path(args.file)
     data = load_json(path)
     im = data.get("itemManager", {})
@@ -967,7 +990,7 @@ def cmd_items(args):
     mods = mod_names(data)
     print(f"=== {path.name} {DASH} {len(items)} items ===")
 
-    # Group by the full (modGuid, id) key — NOT by id alone.
+    # group by the full (modGuid, id) key, NOT by id alone
     groups = {}
     for it in items:
         gj = it.get("_gameId") or {}
@@ -1004,16 +1027,14 @@ def cmd_items(args):
                   + (f"  {hexes}" if hexes else ""))
 
 
-
 def cmd_diff(args):
-    """Diff two slot files."""
+    """Diff two slot files"""
     p1 = Path(args.file1)
     p2 = Path(args.file2)
     d1 = load_json(p1)
     d2 = load_json(p2)
     print(f"=== Diff: {p1.name} vs {p2.name} ===")
     print()
-    # Scalar fields
     scalar_keys = set()
     for d in (d1, d2):
         for k, v in d.items():
@@ -1048,7 +1069,7 @@ def cmd_diff(args):
     if not added and not removed and not changed:
         print("No scalar changes.")
     print()
-    # Flags
+    # flags
     f1 = {f.get("name", "?"): f for f in d1.get("flags", [])}
     f2 = {f.get("name", "?"): f for f in d2.get("flags", [])}
     new_flags = sorted(set(f2) - set(f1))
@@ -1062,7 +1083,6 @@ def cmd_diff(args):
         for n in gone_flags:
             print(f"  - {n}")
     print()
-    # Stats comparison
     print("Key stats comparison:")
     for k in ["money","subs","followers","moneyEarnedFromDonations","streamCount","streamedFor"]:
         v1 = d1.get(k)
@@ -1071,11 +1091,14 @@ def cmd_diff(args):
             v1n = v1 if v1 is not None else 0
             v2n = v2 if v2 is not None else 0
             delta = v2n - v1n
-            print(f"  {label_for(k):<30} {v1n:>12,} {ARROW} {v2n:>12,}  ({'+' if delta>=0 else ''}{delta:,})")
+            print(
+                f"  {label_for(k):<30} {v1n:>12,} {ARROW} {v2n:>12,}  "
+                f"({'+' if delta>=0 else ''}{delta:,})"
+            )
 
 
 def cmd_story(args):
-    """Analyze storyTextIds_Comp from save.mdrg."""
+    """Analyze storyTextIds_Comp from save.mdrg"""
     path = Path(args.file)
     data = load_json(path)
     raw = data.get("storyTextIds_Comp", "")
@@ -1088,14 +1111,14 @@ def cmd_story(args):
         dec = base64.b64decode(raw)
         print(f"  Decoded length: {len(dec)} bytes")
         print(f"  Distinct bytes: {len(set(dec))} of {len(dec)}")
-        # Try deflate
+        # try deflate
         try:
             out = zlib.decompress(dec, -15)
             print(f"  Raw-deflate OK: {len(out)} bytes")
-            # Check for repeating patterns in decoded
+            # check for repeating patterns in decoded
             tail = dec[-30:]
             print(f"  Tail bytes hex: {tail.hex()}")
-            # Check if tail is repeating
+            # check if tail is repeating
             for blen in [4, 6, 8, 12, 16, 21]:
                 if len(dec) >= blen * 4:
                     b = dec[-blen*3:]
@@ -1106,7 +1129,10 @@ def cmd_story(args):
                         reps += 1; i -= blen
                     if reps >= 3:
                         print(f"  Repeating block at tail: {pat.hex()} (len {blen}, {reps+1} reps)")
-                        print(f"  {ARROW} Likely XOR-encrypted with {blen}-byte key, tail is padding")
+                        print(
+                            f"  {ARROW} Likely XOR-encrypted with "
+                            f"{blen}-byte key, tail is padding"
+                        )
         except Exception as e:
             print(f"  Raw-deflate FAIL: {e}")
     except Exception as e:
@@ -1117,7 +1143,7 @@ def cmd_story(args):
 
 
 def cmd_slots(args):
-    """List all save slots from a directory with progression."""
+    """List all save slots from a directory with progression"""
     directory = resolve_saves_dir(getattr(args, "directory", None))
     if not directory.is_dir():
         print(f"Error: {directory} is not a directory", file=sys.stderr)
@@ -1144,25 +1170,52 @@ def cmd_slots(args):
 
     if auto_slots:
         print("=== Auto-Saves (A*.mdrgslot) ===")
-        print(f"{'File':<20} {'Time':>8} {'Stage':>5} {'Money':>12} {'Subs':>5} {'Fol':>5} {'Flags':>5} {'Streams':>7}")
+        print(
+            f"{'File':<20} {'Time':>8} {'Stage':>5} "
+            f"{'Money':>12} {'Subs':>5} {'Fol':>5} "
+            f"{'Flags':>5} {'Streams':>7}"
+        )
         print(H_LINE * 75)
         for d in auto_slots:
-            print(f"{(d.get('botName','')+'-'+str(d.get('time','')))[:19]:<20} {d.get('time',''):>8} {d.get('stage','') or '':>5} {num(d.get('money')):>12,} {num(d.get('subs')):>5} {num(d.get('followers')):>5} {len(d.get('flags',[])):>5} {d.get('streamCount','') or '':>7}")
+            row = (
+                f"{(d.get('botName','')+'-'+str(d.get('time','')))[:19]:<20} "
+                f"{d.get('time',''):>8} {d.get('stage','') or '':>5} "
+                f"{num(d.get('money')):>12,} {num(d.get('subs')):>5} "
+                f"{num(d.get('followers')):>5} {len(d.get('flags',[])):>5} "
+                f"{d.get('streamCount','') or '':>7}"
+            )
+            print(row)
         print()
 
     if manual_slots:
         print("=== Manual Saves (M*.mdrgslot) ===")
-        print(f"{'File':<20} {'Time':>8} {'Stage':>5} {'Money':>12} {'Subs':>5} {'Fol':>5} {'Flags':>5} {'Streams':>7}")
+        print(
+            f"{'File':<20} {'Time':>8} {'Stage':>5} "
+            f"{'Money':>12} {'Subs':>5} {'Fol':>5} "
+            f"{'Flags':>5} {'Streams':>7}"
+        )
         print(H_LINE * 75)
         for d in manual_slots:
-            print(f"{(d.get('botName','')+'-'+str(d.get('time','')))[:19]:<20} {d.get('time',''):>8} {d.get('stage','') or '':>5} {num(d.get('money')):>12,} {num(d.get('subs')):>5} {num(d.get('followers')):>5} {len(d.get('flags',[])):>5} {d.get('streamCount','') or '':>7}")
+            row = (
+                f"{(d.get('botName','')+'-'+str(d.get('time','')))[:19]:<20} "
+                f"{d.get('time',''):>8} {d.get('stage','') or '':>5} "
+                f"{num(d.get('money')):>12,} {num(d.get('subs')):>5} "
+                f"{num(d.get('followers')):>5} {len(d.get('flags',[])):>5} "
+                f"{d.get('streamCount','') or '':>7}"
+            )
+            print(row)
         print()
 
     if manual_slots:
         print("=== Manual Save Progression ===")
         for i, d in enumerate(manual_slots):
             t = d.get("time", 0)
-            print(f"  M{i+1}: in-game {t} ({ingame_time_str(t)}), money={num(d.get('money')):,}, subs={num(d.get('subs'))}, flags={len(d.get('flags',[]))}")
+            print(
+                f"  M{i+1}: in-game {t} ({ingame_time_str(t)}), "
+                f"money={num(d.get('money')):,}, "
+                f"subs={num(d.get('subs'))}, "
+                f"flags={len(d.get('flags',[]))}"
+            )
 
 
 def cmd_dump(args):
@@ -1198,7 +1251,7 @@ def cmd_dump(args):
 
 
 def cmd_extract(args):
-    """Extract a specific field from a file."""
+    """Extract a specific field from a file"""
     path = Path(args.file)
     data = load_json(path)
     field = args.field
@@ -1227,7 +1280,7 @@ def cmd_extract(args):
 
 
 def cmd_playerprefs(args):
-    """Parse PlayerPrefs.pp."""
+    """Parse PlayerPrefs.pp"""
     path = Path(args.file)
     data = load_json(path)
     print(f"=== PlayerPrefs: {path.name} ===")
@@ -1247,10 +1300,9 @@ def cmd_playerprefs(args):
             print(f"  {e['Key']}: {val}")
 
 
-# ── Editing helpers ──────────────────────────────────────────────
 
 def backup_file(path):
-    """Create a .bak backup of a file."""
+    """Create a .bak backup of a file"""
     bak = path.with_suffix(path.suffix + ".bak")
     with open(path, "rb") as f_in, open(bak, "wb") as f_out:
         f_out.write(f_in.read())
@@ -1258,7 +1310,7 @@ def backup_file(path):
 
 
 def parse_value(s):
-    """Parse a string into the appropriate Python type."""
+    """Parse a string into the appropriate Python type"""
     if s.lower() == "true":
         return True
     if s.lower() == "false":
@@ -1279,7 +1331,7 @@ def parse_value(s):
 
 
 def parse_path(path_str):
-    """Parse 'itemManager.items[0]._count' into [(type,key), ...]."""
+    """Parse 'itemManager.items[0]._count' into [(type,key), ...]"""
     parts = []
     current = ""
     i = 0
@@ -1308,7 +1360,7 @@ def parse_path(path_str):
 
 
 def set_path(data, path_str, value):
-    """Set a value at the given path."""
+    """Set a value at the given path"""
     parts = parse_path(path_str)
     if not parts:
         raise ValueError("Empty path")
@@ -1320,7 +1372,7 @@ def set_path(data, path_str, value):
 
 
 def format_value(v):
-    """Format a value for display."""
+    """Format a value for display"""
     if v is None:
         return "null"
     if isinstance(v, bool):
@@ -1338,7 +1390,7 @@ def format_value(v):
     return str(v)
 
 
-# ── Item id -> name table (Il2CppGameItems.ItemEnum) ─────────────────────────
+# Item id -> name table (Il2CppGameItems.ItemEnum)
 #
 # `_gameId` is a PAIR (modGuid, id):
 #   empty guid -> VANILLA item; _id indexes Il2CppGameItems.ItemEnum
@@ -1347,12 +1399,15 @@ def format_value(v):
 # Names come from item_ids.txt (id<TAB>name), generated by fix_enum.py from the
 # decompiled assembly. Mod names come from sets[].UsedMods[].
 
+# The ai was just saying shi so I figured I should put it here ig..?
+
+
 ITEM_NAMES = {}
 _COLOR_KEYS = ("r", "g", "b", "a")
 
 
 def load_item_names():
-    """Load id -> name from item_ids.txt beside this script."""
+    """Load id -> name from item_ids.txt beside this script"""
     if ITEM_NAMES:
         return ITEM_NAMES
     here = Path(__file__).resolve().parent
@@ -1379,7 +1434,7 @@ def load_item_names():
 
 
 def mod_names(data):
-    """Map mod GUID -> mod name, harvested from sets[].UsedMods[]."""
+    """Map mod GUID -> mod name, harvested from sets[].UsedMods[]"""
     out = {}
     for st in ((data or {}).get("itemManager") or {}).get("sets") or []:
         for m in st.get("UsedMods") or []:
@@ -1391,7 +1446,7 @@ def mod_names(data):
 
 
 def gameid_label(guid, gid, mods=None):
-    """Human label for a (_gameId._guid, _gameId._id) pair."""
+    """Human label for a (_gameId._guid, _gameId._id) pair"""
     if guid:
         who = (mods or {}).get(guid) or f"mod {guid[:8]}"
         return f"[mod] {who} #{gid}"
@@ -1399,10 +1454,8 @@ def gameid_label(guid, gid, mods=None):
     return f"{name} (#{gid})" if name else f"#{gid}"
 
 
-# ── Reverse lookup: name -> id, and the slot database ───────────────────────
-
 def find_item_id(text):
-    """Resolve an item id from a number or a fuzzy internal name."""
+    """Resolve an item id from a number or a fuzzy internal name"""
     names = load_item_names()
     t = text.strip()
     if t.lstrip("-").isdigit():
@@ -1425,7 +1478,7 @@ SLOT_DB = {}
 
 
 def load_slot_db():
-    """slot -> [(id, name)] from items_by_slot.json (optional)."""
+    """slot -> [(id, name)] from items_by_slot.json (optional)"""
     if SLOT_DB:
         return SLOT_DB
     here = Path(__file__).resolve().parent
@@ -1440,10 +1493,11 @@ def load_slot_db():
     return SLOT_DB
 
 
-# ── Item record construction ────────────────────────────────────────────────
+# Item record construction
 #
 # Key order matches what the game writes, so a record created here is
 # byte-comparable with a native one.
+
 
 ITEM_KEY_ORDER = [
     "I", "F", "S", "_count", "_quality", "IsFavourite", "_id", "_gameId",
@@ -1476,7 +1530,7 @@ def new_item(gid, mod_guid="", count=1, quality=1.0, slot="", colors=1,
 
 
 def item_summary(it, mods=None):
-    """One-line description of an item record."""
+    """One-line description of an item record"""
     gj = it.get("_gameId") or {}
     guid = ((gj.get("_guid") or {}).get("serializedGuid") or "").strip()
     label = gameid_label(guid, gj.get("_id"), mods)
@@ -1494,7 +1548,7 @@ def item_summary(it, mods=None):
 
 
 def iter_all_items(paths):
-    """Yield (path, index, item, data) for every item in the given files."""
+    """Yield (path, index, item, data) for every item in the given files"""
     for p in paths:
         p = Path(p)
         try:
@@ -1506,7 +1560,7 @@ def iter_all_items(paths):
 
 
 def find_guids(data):
-    """All item GUIDs in a save, plus duplicates."""
+    """All item GUIDs in a save, plus duplicates"""
     seen, dups = Counter(), []
     for it in (data.get("itemManager") or {}).get("items") or []:
         g = (it.get("UniqueItemGuid") or {}).get("serializedGuid")
@@ -1517,10 +1571,8 @@ def find_guids(data):
     return seen, dups
 
 
-# ── Colour helpers (stored as float 0..1, edited as int 0..255) ──────────────
-
 def is_color_dict(d):
-    """True if d looks exactly like a colour entry {r,g,b[,a]} of numbers."""
+    """True if d looks exactly like a colour entry {r,g,b[,a]} of numbers"""
     if not isinstance(d, dict) or not d:
         return False
     if not set(d.keys()) <= set(_COLOR_KEYS):
@@ -1532,7 +1584,7 @@ def is_color_dict(d):
 
 
 def to255(v):
-    """float 0..1 -> int 0..255 (for display)."""
+    """float 0..1 -> int 0..255 (for display)"""
     try:
         return max(0, min(255, int(round(float(v) * 255))))
     except (TypeError, ValueError):
@@ -1540,18 +1592,18 @@ def to255(v):
 
 
 def from255(n):
-    """int 0..255 -> float 0..1 (for storage)."""
+    """int 0..255 -> float 0..1 (for storage)"""
     return max(0.0, min(1.0, float(n) / 255.0))
 
 
 def color_hex(d):
-    """#RRGGBB preview for a colour dict."""
+    """#RRGGBB preview for a colour dict"""
     return "#{:02X}{:02X}{:02X}".format(
         to255(d.get("r", 0)), to255(d.get("g", 0)), to255(d.get("b", 0)))
 
 
 def coerce_color(text, old):
-    """Interpret user input for one colour channel.
+    """Interpret user input for one colour channel
 
     > 1   -> treated as 0..255 and divided by 255
     0..1  -> literal float (legacy/float entry)
@@ -1568,17 +1620,17 @@ def coerce_color(text, old):
 
 
 def normalize_colors(data):
-    """Force ITEM colour entries (`_colors[]`) to float 0..1.
+    """Force ITEM colour entries (`_colors[]`) to float 0..1
 
-    *** Only dicts reached through a key named `_colors` are touched. ***
+    *** Only dicts reached through a key named `_colors` are touched ***
 
     The game uses TWO different colour encodings:
         itemManager.items[]._colors[]           -> FLOATS 0..1
         botStatusAppManager._consoleStyle.*     -> INTS   0..255
     A blanket sweep over every {r,g,b,a} dict would silently divide the UI-style
-    colours by 255 and destroy them. Verified against a real save.
+    colors by 255 and destroy them. Verified against a real save
 
-    Returns the list of channels that were changed.
+    Returns the list of channels that were changed
     """
     fixes = []
 
@@ -1605,14 +1657,12 @@ def normalize_colors(data):
     return fixes
 
 
-
 def cmd_set(args):
-    """Set a value at a given path (non-interactive)."""
+    """Set a value at a given path (non-interactive)"""
     path = Path(args.file)
     data = load_data(path)
     value = parse_value(args.value)
 
-    # Colour channels may be given as 0..255 or as a literal 0..1 float.
     try:
         parts = parse_path(args.path)
         parent = data
@@ -1640,7 +1690,7 @@ def cmd_set(args):
 
 
 def item_context_lines(node, mods=None):
-    """Header lines describing an item record (label, slot, colour swatches)."""
+    """Header lines describing an item record (label, slot, colour swatches)"""
     if not isinstance(node, dict) or "_gameId" not in node:
         return []
     gj = node.get("_gameId") or {}
@@ -1656,28 +1706,28 @@ def item_context_lines(node, mods=None):
 
 
 def editor_child_value(v):
-    """Value string for a child row (colour dicts show a hex swatch)."""
+    """Value string for a child row (colour dicts show a hex swatch)"""
     if is_color_dict(v):
         return f"{color_hex(v)}  {len(v)} ch"
     return format_value(v)
 
 
 def editor_scalar_value(parent, key, v):
-    """Value string for a scalar row (colour channels shown as 0..255)."""
+    """Value string for a scalar row (colour channels shown as 0..255)"""
     if key in _COLOR_KEYS and is_color_dict(parent) and isinstance(v, (int, float)):
         return f"{to255(v):>3}/255   {float(v):.6g}"
     return format_value(v)
 
 
 def edit_prefill(parent, key, value):
-    """Initial edit buffer: colour channels start as 0..255 integers."""
+    """Initial edit buffer: colour channels start as 0..255 integers"""
     if key in _COLOR_KEYS and is_color_dict(parent) and isinstance(value, (int, float)):
         return str(to255(value))
     return repr(value)
 
 
 def cmd_edit(args):
-    """Interactive TUI editor (curses)."""
+    """Interactive TUI editor (curses)"""
     path = Path(args.file)
     data = load_data(path)
     edit_data = data
@@ -1687,7 +1737,11 @@ def cmd_edit(args):
             print(f"Error: {path.name} has no embedded gameplay data", file=sys.stderr)
             sys.exit(1)
         if len(records) > 1:
-            print(f"Error: {path.name} contains multiple saves; edit is not ambiguous-safe", file=sys.stderr)
+            print(
+            f"Error: {path.name} contains multiple saves; "
+            f"edit is not ambiguous-safe",
+            file=sys.stderr,
+        )
             sys.exit(1)
         edit_data = records[0]
     try:
@@ -1707,9 +1761,8 @@ def cmd_edit(args):
 
 
 def _interactive_edit(stdscr, data, path, save_root=None):
-    """Curses-based interactive editor."""
+    """Curses-based interactive editor"""
     import curses
-    # Keep standalone Esc responsive while still recognizing arrow-key sequences.
     try:
         curses.set_escdelay(25)
     except AttributeError:
@@ -1722,14 +1775,14 @@ def _interactive_edit(stdscr, data, path, save_root=None):
 
     # Color pairs
     for cp, fg, bg in [
-        (1, curses.COLOR_CYAN, curses.COLOR_BLACK),
-        (2, curses.COLOR_YELLOW, curses.COLOR_BLACK),
-        (3, curses.COLOR_GREEN, curses.COLOR_BLACK),
-        (4, curses.COLOR_RED, curses.COLOR_BLACK),
-        (5, curses.COLOR_WHITE, curses.COLOR_BLUE),
-        (6, curses.COLOR_BLACK, curses.COLOR_WHITE),
-        (7, curses.COLOR_BLUE, curses.COLOR_BLACK),
-        (8, curses.COLOR_MAGENTA, curses.COLOR_BLACK),
+        (1, curses.COLOR_CYAN,      curses.COLOR_BLACK),
+        (2, curses.COLOR_YELLOW,    curses.COLOR_BLACK),
+        (3, curses.COLOR_GREEN,     curses.COLOR_BLACK),
+        (4, curses.COLOR_RED,       curses.COLOR_BLACK),
+        (5, curses.COLOR_WHITE,     curses.COLOR_BLUE),
+        (6, curses.COLOR_BLACK,     curses.COLOR_WHITE),
+        (7, curses.COLOR_BLUE,      curses.COLOR_BLACK),
+        (8, curses.COLOR_MAGENTA,   curses.COLOR_BLACK),
     ]:
         try:
             curses.init_pair(cp, fg, bg)
@@ -1751,7 +1804,6 @@ def _interactive_edit(stdscr, data, path, save_root=None):
     load_item_names()
     load_slot_db()
 
-    # ── extra editor state (navigation / history / clipboard) ───────────────
     filter_text = ""
     filter_prompt = False
     filter_buffer = ""
@@ -1797,12 +1849,18 @@ def _interactive_edit(stdscr, data, path, save_root=None):
                     type_str = f"dict/{len(v)}" if isinstance(v, dict) else f"list/{len(v)}"
                     children.append((k, BULLET, type_str, editor_child_value(v), "container"))
                 else:
-                    children.append((k, " ", "scalar", editor_scalar_value(current, k, v), "scalar"))
+                    children.append((
+                        k, " ", "scalar",
+                        editor_scalar_value(current, k, v), "scalar"
+                    ))
         elif isinstance(current, list):
             for i, v in enumerate(current):
                 if isinstance(v, (dict, list)):
                     type_str = f"dict/{len(v)}" if isinstance(v, dict) else f"list/{len(v)}"
-                    children.append((f"[{i}]", BULLET, type_str, editor_child_value(v), "container"))
+                    children.append((
+                        f"[{i}]", BULLET, type_str,
+                        editor_child_value(v), "container"
+                    ))
                 else:
                     children.append((f"[{i}]", " ", "scalar", format_value(v), "scalar"))
 
@@ -1815,8 +1873,10 @@ def _interactive_edit(stdscr, data, path, save_root=None):
                 selected = max(0, len(children) - 1)
                 scroll = 0
 
-        # Header
-        pos = f" [{selected + 1}/{len(children)}]" if children else " [0/0]"
+        if filter_text:
+            pos = f" [{selected + 1}/{len(children)}/{total_children}]" if children else f" [0/{total_children}]"
+        else:
+            pos = f" [{selected + 1}/{total_children}]" if children else " [0/0]"
         filt = f"  /{filter_text}" if filter_text else ""
         try:
             hdr = f" mdrg-savefile-editor edit {DASH} {path.name}{pos}{filt} "
@@ -1824,64 +1884,93 @@ def _interactive_edit(stdscr, data, path, save_root=None):
         except curses.error:
             pass
 
-        # Path
         try:
             stdscr.addstr(1, 0, f" Path: {current_path_str}"[: w - 1], curses.color_pair(1))
         except curses.error:
             pass
 
-        # Help overlay takes over the screen
+        HELP_SECTIONS = [
+            {
+                "title": "Navigation",
+                "entries": [
+                    (f"{UP}{DN}  W S", "move selection"),
+                    (f"{LEFT}  A  ESC", "go up one level / clear filter"),
+                    (f"{RIGHT}  D  Enter", "descend / edit scalar"),
+                    ("g / G", "jump to first / last entry"),
+                    ("Ctrl+U / Ctrl+D", "page up / page down"),
+                    ("Home / End", "first / last"),
+                    ("/", "filter entries (ESC clears)"),
+                    (":", "jump to a path, e.g. itemManager.items[0]._count"),
+                ],
+            },
+            {
+                "title": "Editing",
+                "entries": [
+                    ("e", "edit the selected scalar"),
+                    ("Tab", "cycle value type (bool/int/float/str)"),
+                    ("+ -  [ ]", "adjust (colour mode: +/-1 / +/-8)"),
+                    ("H", "colour: enter #RRGGBB"),
+                    ("n", "add a key (dict) or append a value (list)"),
+                    ("r", "rename the selected key"),
+                    ("x", "delete the selected key / list entry"),
+                    ("c", "clone entry (fresh guid for items)"),
+                    ("y / p", "yank value / paste into the selection"),
+                    ("u / Ctrl+R", "undo / redo"),
+                ],
+            },
+            {
+                "title": "Files",
+                "entries": [
+                    ("o  Ctrl+S", "save (makes a .bak first)"),
+                    ("q", "quit (asks again if there are unsaved changes)"),
+                    ("?", "close this help"),
+                ],
+            },
+            {
+                "title": "Note",
+                "entries": [
+                    ("ESC", "never quits — arrow keys send ESC and a split read;"),
+                    ("",     "otherwise the editor would close mid-navigation."),
+                ],
+            },
+        ]
+
         if help_mode:
-            rows = [
-                ("Navigation", ""),
-                (f"{UP}{DN}  W S", "move selection"),
-                (f"{LEFT}  A  ESC", "go up one level / clear filter"),
-                (f"{RIGHT}  D  Enter", "descend / edit scalar"),
-                ("g / G", "jump to first / last entry"),
-                ("Ctrl+U / Ctrl+D", "page up / page down"),
-                ("Home / End", "first / last"),
-                ("/", "filter entries (ESC clears)"),
-                (":", "jump to a path, e.g. itemManager.items[0]._count"),
-                ("", ""),
-                ("Editing", ""),
-                ("e", "edit the selected scalar"),
-                ("Tab", "cycle value type (bool/int/float/str)"),
-                ("+ -  [ ]", "adjust (colour mode: +/-1 / +/-8)"),
-                ("H", "colour: enter #RRGGBB"),
-                ("n", "add a key (dict) or append a value (list)"),
-                ("r", "rename the selected key"),
-                ("x", "delete the selected key / list entry"),
-                ("c", "clone entry (fresh guid for items)"),
-                ("y / p", "yank value / paste into the selection"),
-                ("u / Ctrl+R", "undo / redo"),
-                ("", ""),
-                ("Files", ""),
-                ("o  Ctrl+S", "save (makes a .bak first)"),
-                ("q", "quit (asks again if there are unsaved changes)"),
-                ("?", "close this help"),
-                ("", ""),
-                ("Note: ESC never quits - arrow keys send ESC and a split read", ""),
-                ("would otherwise close the editor mid-navigation.", ""),
-            ]
-            for i, (k, desc) in enumerate(rows):
-                if i + 2 >= h - 1:
+            y = 2
+            for section in HELP_SECTIONS:
+                if y < h - 1 and section["title"]:
+                    try:
+                        stdscr.addstr(y, 1, section["title"], curses.color_pair(2) | curses.A_BOLD)
+                    except curses.error:
+                        pass
+                    y += 1
+
+                for key, desc in section["entries"]:
+                    if y >= h - 1:
+                        break
+                    if not key and not desc:
+                        continue
+                    try:
+                        if desc:
+                            stdscr.addstr(y, 1, f" {key:<18}", curses.color_pair(3) | curses.A_BOLD)
+                            stdscr.addstr(y, 20, desc[: w - 22])
+                        else:
+                            stdscr.addstr(y, 1, key, curses.color_pair(2) | curses.A_BOLD)
+                    except curses.error:
+                        pass
+                    y += 1
+
+                if y < h - 1:
+                    y += 1
+
+                if y >= h - 1:
                     break
-                if not k and not desc:
-                    continue
-                try:
-                    if desc:
-                        stdscr.addstr(i + 2, 1, f" {k:<18}", curses.color_pair(3) | curses.A_BOLD)
-                        stdscr.addstr(i + 2, 20, desc[: w - 22])
-                    else:
-                        stdscr.addstr(i + 2, 1, k, curses.color_pair(2) | curses.A_BOLD)
-                except curses.error:
-                    pass
+
             stdscr.refresh()
             stdscr.getch()
             help_mode = False
             continue
 
-        # Type info (+ decoded item context when sitting on an item record)
         if isinstance(current, dict):
             type_line = f" Type: dict ({len(current)} keys)"
         elif isinstance(current, list):
@@ -1906,7 +1995,6 @@ def _interactive_edit(stdscr, data, path, save_root=None):
 
         start_row = row
 
-        # Filter / jump / rename prompts
         if filter_prompt or jump_prompt or rename_prompt:
             if filter_prompt:
                 label, buf = " filter ", filter_buffer
@@ -1923,15 +2011,25 @@ def _interactive_edit(stdscr, data, path, save_root=None):
                 pass
             start_row = row + 3
 
-        # Edit mode overlay
         if edit_mode:
             try:
-                stdscr.addstr(row, 0, f" Edit {edit_key}: {edit_buffer}_"[: w - 1], curses.color_pair(3) | curses.A_BOLD)
+                stdscr.addstr(
+                    row, 0,
+                    f" Edit {edit_key}: {edit_buffer}_"[: w - 1],
+                    curses.color_pair(3) | curses.A_BOLD
+                )
             except curses.error:
                 pass
             if edit_parent is not None:
                 try:
-                    stdscr.addstr(row + 1, 0, f" Current: {editor_scalar_value(edit_parent, edit_key, edit_parent[edit_key])}"[: w - 1], curses.color_pair(2))
+                    current_val = editor_scalar_value(
+                        edit_parent, edit_key, edit_parent[edit_key]
+                    )
+                    stdscr.addstr(
+                        row + 1, 0,
+                        f" Current: {current_val}"[: w - 1],
+                        curses.color_pair(2),
+                    )
                 except Exception:
                     pass
             try:
@@ -1944,7 +2042,6 @@ def _interactive_edit(stdscr, data, path, save_root=None):
                 pass
             start_row = row + 4
 
-        # Children
         visible = max(1, h - start_row - 2)
         end = min(scroll + visible, len(children))
         for i in range(scroll, end):
@@ -1965,8 +2062,10 @@ def _interactive_edit(stdscr, data, path, save_root=None):
             except curses.error:
                 pass
 
-        # Footer
-        footer = " ↑↓←→:nav  /:filter  ::jump  e:edit  r:rename  x:del  c:clone  y/p  n:add  u:undo  ?:help  o:save  q:quit "
+        footer = (
+            " ↑↓←→:nav  /:filter  ::jump  e:edit  r:rename  x:del  "
+            "c:clone  y/p  n:add  u:undo  ?:help  o:save  q:quit "
+        )
         if is_color_dict(current):
             footer = (" colour: ↑↓:channel  +/-:±1  [ ]:±8  H:hex  e/→:type 0-255  "
                       "u:undo  ?:help  o:save  q:quit ")
@@ -1993,12 +2092,8 @@ def _interactive_edit(stdscr, data, path, save_root=None):
                 if edit_parent is not None and edit_key is not None:
                     is_chan = (edit_key in _COLOR_KEYS and is_color_dict(edit_parent))
                     if is_chan and not edit_dirty:
-                        # No-op guard: the 0..255 view is lossy (0.5 -> 128 ->
-                        # 0.50196). Confirming an untouched channel must leave the
-                        # stored float EXACTLY as it was.
                         new_val = edit_parent[edit_key]
                     elif is_chan:
-                        # Colour channels: accept 0..255 (or a literal 0..1).
                         new_val = coerce_color(edit_buffer, edit_parent[edit_key])
                     else:
                         new_val = parse_value(edit_buffer)
@@ -2018,10 +2113,15 @@ def _interactive_edit(stdscr, data, path, save_root=None):
                 edit_key = ""
                 edit_parent = None
                 edit_dirty = False
-            elif key in (9,):  # Tab — toggle type / colour representation
+            elif key in (9,):  # Tab for toggle type / colour representation
                 if edit_parent is not None and edit_key is not None:
                     cur = edit_parent.get(edit_key) if isinstance(edit_parent, dict) else None
-                    if edit_key in _COLOR_KEYS and is_color_dict(edit_parent) and isinstance(cur, (int, float)):
+                    is_colour_channel = (
+                        edit_key in _COLOR_KEYS
+                        and is_color_dict(edit_parent)
+                        and isinstance(cur, (int, float))
+                    )
+                    if is_colour_channel:
                         # flip between the 0..255 view and the stored 0..1 float
                         edit_buffer = (f"{float(cur):.6g}" if edit_buffer.strip() == str(to255(cur))
                                        else str(to255(cur)))
@@ -2041,7 +2141,7 @@ def _interactive_edit(stdscr, data, path, save_root=None):
                 edit_dirty = True
             continue
 
-        # ── prompt modes (filter / jump / rename) ───────────────────────────
+        # prompt modes (filter / jump / rename)
         if filter_prompt or jump_prompt or rename_prompt:
             if key == 27:
                 filter_prompt = jump_prompt = rename_prompt = False
@@ -2106,7 +2206,9 @@ def _interactive_edit(stdscr, data, path, save_root=None):
             selected -= 1
             if selected < scroll:
                 scroll = selected
-        elif (key == curses.KEY_DOWN or key in (ord("s"), ord("S"))) and selected < len(children) - 1:
+        elif (
+            key == curses.KEY_DOWN or key in (ord("s"), ord("S"))
+        ) and selected < len(children) - 1:
             selected += 1
             if selected >= scroll + visible:
                 scroll = selected - visible + 1
@@ -2256,8 +2358,13 @@ def _interactive_edit(stdscr, data, path, save_root=None):
                         idx = int(name[1:-1])
                         edit_parent = current
                         edit_key = str(idx)
-                    edit_buffer = edit_prefill(edit_parent, edit_key,
-                                               current[name] if isinstance(current, dict) else current[idx])
+                    edit_target = (
+                        current[name] if isinstance(current, dict)
+                        else current[idx]
+                    )
+                    edit_buffer = edit_prefill(
+                        edit_parent, edit_key, edit_target
+                    )
                     edit_mode = True
                     edit_dirty = False
         elif key == ord("e") or key == ord("E"):
@@ -2272,11 +2379,20 @@ def _interactive_edit(stdscr, data, path, save_root=None):
                         edit_parent = current
                         edit_key = str(idx)
                     edit_mode = True
-                    edit_buffer = edit_prefill(edit_parent, edit_key,
-                                               current[name] if isinstance(current, dict) else current[idx])
+                    edit_target = (
+                        current[name] if isinstance(current, dict)
+                        else current[idx]
+                    )
+                    edit_buffer = edit_prefill(
+                        edit_parent, edit_key, edit_target
+                    )
                     edit_dirty = False
-        elif key in (ord("+"), ord("="), ord("-"), ord("["), ord("]")) and is_color_dict(current) and selected < len(children):
-            # Colour adjuster: nudge the selected channel without typing.
+        elif (
+            key in (ord("+"), ord("="), ord("-"), ord("["), ord("]"))
+            and is_color_dict(current)
+            and selected < len(children)
+        ):
+            # color adjuster: nudge the selected channel without typing.
             name = children[selected][0]
             if name in _COLOR_KEYS:
                 step = 8 if key in (ord("["), ord("]")) else 1
@@ -2290,7 +2406,7 @@ def _interactive_edit(stdscr, data, path, save_root=None):
                 saved_flag = True
                 last_was_nudge = True
         elif key in (ord("h"), ord("H")) and is_color_dict(current):
-            # Hex entry: "#RRGGBB" applied to r,g,b
+            # hex entry #rrggbb applied to r,g,b
             try:
                 stdscr.addstr(h - 2, 0, " Hex (RRGGBB): "[: w - 1], curses.color_pair(5))
                 stdscr.refresh()
@@ -2310,9 +2426,9 @@ def _interactive_edit(stdscr, data, path, save_root=None):
                 except Exception:
                     pass
         elif key == ord("n") or key == ord("N"):
-            # Add new item
+            # add item
             if isinstance(current, dict):
-                # Prompt for key
+                # prompt for key
                 try:
                     stdscr.addstr(h - 2, 0, " New key: "[: w - 1], curses.color_pair(5))
                     stdscr.refresh()
@@ -2323,7 +2439,9 @@ def _interactive_edit(stdscr, data, path, save_root=None):
                         stdscr.addstr(h - 2, 0, " New value: "[: w - 1], curses.color_pair(5))
                         stdscr.refresh()
                         curses.echo()
-                        new_val_str = stdscr.getstr(h - 2, 13, w - 14).decode("utf-8", errors="replace")
+                        new_val_str = stdscr.getstr(
+                            h - 2, 13, w - 14
+                        ).decode("utf-8", errors="replace")
                         curses.noecho()
                         snapshot()
                         current[new_key] = parse_value(new_val_str)
@@ -2367,9 +2485,6 @@ def _interactive_edit(stdscr, data, path, save_root=None):
                 except Exception as e2:
                     print(f"Error: {e2}", file=sys.stderr)
         elif key in (curses.KEY_LEFT, ord("a")):
-            # NOTE: ESC (27) deliberately does NOT quit. Arrow keys arrive as
-            # ESC + '[' + letter, and a split read turns that into a bare ESC,
-            # which would quit the editor while the user is just navigating.
             if edit_mode:
                 edit_mode = False
                 edit_buffer = ""
@@ -2399,8 +2514,6 @@ def _interactive_edit(stdscr, data, path, save_root=None):
             else:
                 break
         elif key == 27:
-            # ESC never quits: arrow keys arrive as ESC + '[' + letter, and a
-            # split read turns that into a bare ESC. Treat it as "cancel/back".
             if edit_mode:
                 edit_mode = False
                 edit_buffer = ""
@@ -2421,10 +2534,8 @@ def _interactive_edit(stdscr, data, path, save_root=None):
                 status_msg = "at root - press q or o"
 
 
-# ── Item selection helpers ───────────────────────────────────────────────────
-
 def select_items(data, selector):
-    """Resolve a selector to [(index, item), ...].
+    """Resolve a selector to [(index, item), ...]
 
     Accepted forms:
         @3            index into items[]
@@ -2474,10 +2585,8 @@ def select_items(data, selector):
     return out
 
 
-# ── New commands: inventory / slotsdb / find / colour ------------------------
-
 def cmd_inventory(args):
-    """Rich inventory listing with names, slots, colours and filtering."""
+    """Rich inventory listing with names, slots, colours and filtering"""
     load_item_names()
     paths = collect_files(args.files)
     total = 0
@@ -2528,7 +2637,7 @@ def cmd_inventory(args):
 
 
 def cmd_slotsdb(args):
-    """Show which items can go in each slot (from items_by_slot.json)."""
+    """Show which items can go in each slot (from items_by_slot.json)"""
     db = load_slot_db()
     if not db:
         print("items_by_slot.json not found next to the script", file=sys.stderr)
@@ -2543,7 +2652,7 @@ def cmd_slotsdb(args):
 
 
 def cmd_find(args):
-    """Search saves for item names, keys, or values."""
+    """Search saves for item names, keys, or values"""
     needle = args.text.lower()
     paths = collect_files(args.targets)
     load_item_names()
@@ -2566,7 +2675,7 @@ def cmd_find(args):
 
 
 def cmd_color(args):
-    """View or set an item's colours (0..255 in, float 0..1 out)."""
+    """View or set an item's colours (0..255 in, float 0..1 out)"""
     path = Path(args.file)
     data = load_data(path)
     load_item_names()
@@ -2601,10 +2710,8 @@ def cmd_color(args):
         print(f"\nupdated {changed} channel(s)  (backup: {bak.name})")
 
 
-# ── New commands: structural edits -------------------------------------------
-
 def cmd_additem(args):
-    """Add an item to a save's inventory."""
+    """Add an item to a save's inventory"""
     path = Path(args.file)
     data = load_data(path)
     im = data.setdefault("itemManager", {})
@@ -2628,7 +2735,7 @@ def cmd_additem(args):
 
 
 def cmd_delitem(args):
-    """Remove item(s) from a save's inventory."""
+    """Remove item(s) from a save's inventory"""
     path = Path(args.file)
     data = load_data(path)
     mods = mod_names(data)
@@ -2659,7 +2766,7 @@ def cmd_delitem(args):
 
 
 def cmd_dupe(args):
-    """Duplicate item(s) N times (new GUIDs, independent copies)."""
+    """Duplicate item(s) N times (new GUIDs, independent copies)"""
     path = Path(args.file)
     data = load_data(path)
     mods = mod_names(data)
@@ -2682,7 +2789,7 @@ def cmd_dupe(args):
 
 
 def cmd_equip(args):
-    """Equip or unequip an item."""
+    """Equip or unequip an item"""
     path = Path(args.file)
     data = load_data(path)
     items = (data.get("itemManager") or {}).get("items") or []
@@ -2697,7 +2804,6 @@ def cmd_equip(args):
         return
     db = load_slot_db()
     names = load_item_names()
-    # Slots that legitimately hold several items at once (layered cosmetics).
     LAYERED = {"EyeMakeup"}
     for i, it in matches:
         if args.slot is None:
@@ -2711,9 +2817,10 @@ def cmd_equip(args):
                 homes = [s for s, lst in db.items()
                          if any(x[0] == gid for x in lst)]
                 if homes and args.slot not in homes:
-                    print(f"  ! warning: {names.get(gid, gid)} normally lives in "
-                          f"{', '.join(sorted(homes))}, not {args.slot}")
-            # one item per slot: clear the others (unless the slot layers)
+                    print(
+                        f"  ! warning: {names.get(gid, gid)} normally lives in "
+                        f"{', '.join(sorted(homes))}, not {args.slot}"
+                    )
             if args.slot not in LAYERED:
                 for j, other in enumerate(items):
                     if j != i and (other.get("_equipedSlot") or "") == args.slot:
@@ -2726,7 +2833,7 @@ def cmd_equip(args):
 
 
 def cmd_validate(args):
-    """Sanity-check a save (colours, ids, guids, slots, counts)."""
+    """Sanity-check a save (colours, ids, guids, slots, counts)"""
     path = Path(args.file)
     data = load_data(path)
     items = (data.get("itemManager") or {}).get("items") or []
@@ -2769,7 +2876,11 @@ def cmd_validate(args):
 
     print(f"=== {path.name} ===")
     print(f"  items[]            : {len(items)}")
-    print(f"  distinct guids     : {len({(i.get('UniqueItemGuid') or {}).get('serializedGuid') for i in items})}")
+    n_guids = len({
+        (i.get("UniqueItemGuid") or {}).get("serializedGuid")
+        for i in items
+    })
+    print(f"  distinct guids     : {n_guids}")
     print(f"  equipped slots     : {len(slot_counts)}")
     print(f"  outfit sets        : {len((data.get('itemManager') or {}).get('sets') or [])}")
     print(f"  problems           : {len(problems)}")
@@ -2784,7 +2895,7 @@ def cmd_validate(args):
 
 
 def cmd_backups(args):
-    """List or restore .bak files."""
+    """List or restore .bak files"""
     path = Path(args.file)
     cands = sorted(path.parent.glob(path.name + "*.bak"))
     if args.restore is None:
@@ -2814,7 +2925,7 @@ def cmd_backups(args):
 
 
 def cmd_tree(args):
-    """Dump a file with item names resolved and colours as hex."""
+    """Dump a file with item names resolved and colours as hex"""
     path = Path(args.file)
     data = load_data(path)
     mods = mod_names(data)
@@ -2858,7 +2969,7 @@ def cmd_tree(args):
 
 
 def cmd_export(args):
-    """Export a save to a normalised JSON with item names resolved."""
+    """Export a save to a normalised JSON with item names resolved"""
     path = Path(args.file)
     data = load_data(path)
     mods = mod_names(data)
@@ -2870,11 +2981,11 @@ def cmd_export(args):
         out["items"].append({
             "index": i,
             "label": gameid_label(guid, gj.get("_id"), mods),
-            "id": gj.get("_id"), "modGuid": guid,
+            id: gj.get("_id"), "modGuid": guid,
             "count": it.get("_count"), "quality": it.get("_quality"),
             "slot": it.get("_equipedSlot"),
             "colors": [color_hex(c) for c in (it.get("_colors") or []) if is_color_dict(c)],
-            "guid": (it.get("UniqueItemGuid") or {}).get("serializedGuid"),
+            guid: (it.get("UniqueItemGuid") or {}).get("serializedGuid"),
         })
     for s in (data.get("itemManager") or {}).get("sets") or []:
         out["sets"].append({"name": s.get("Name"), "items": len(s.get("EquippedItems") or [])})
@@ -2905,93 +3016,81 @@ def collect_files(inputs):
     return out
 
 
-# ── Main ─────────────────────────────────────────────────────────────────────
-
 def main():
     parser = argparse.ArgumentParser(
         prog="mdrg-savefile-editor",
         description="Inspect / rip apart My Dystopian Robot Girlfriend save files",
-        epilog="See https://github.com/ for updates. No external dependencies required.",
+        epilog=(
+            "See https://github.com/ for updates. "
+            "No external dependencies required."
+        ),
     )
     parser.add_argument("--ascii", action="store_true",
                         help="force plain ASCII output (auto-enabled on a "
                              "non-UTF8 console; also MDRG_ASCII=1)")
     sub = parser.add_subparsers(dest="command", required=True)
 
-    # scan
     p_scan = sub.add_parser("scan", help="Scan a Saves directory")
     p_scan.add_argument("directory", nargs="?",
                         help="Path to Saves directory (default: auto-detected)")
 
-    # info
     p_info = sub.add_parser("info", help="Show file structure")
     p_info.add_argument("file", help="Path to save file")
 
-    # stats
     p_stats = sub.add_parser("stats", help="Show key stats from a slot file")
     p_stats.add_argument("file", help="Path to .mdrg or .mdrgslot file")
 
-    # analyze
     p_analyze = sub.add_parser("analyze", help="Analyze one or more save files")
     p_analyze.add_argument("files", nargs="+", help="Paths to .mdrg or .mdrgslot files")
 
-    # gui
     p_gui = sub.add_parser("gui", help="Open the graphical save analyzer")
     p_gui.add_argument("files", nargs="*", help="Optional save files to open immediately")
 
-    # flags
     p_flags = sub.add_parser("flags", help="List all flags from a slot file")
     p_flags.add_argument("file", help="Path to .mdrgslot file")
 
-    # emails
     p_emails = sub.add_parser("emails", help="List emails from a slot file")
     p_emails.add_argument("file", help="Path to .mdrgslot file")
     p_emails.add_argument("-d", "--detail", action="store_true", help="Show all email details")
 
-    # items
     p_items = sub.add_parser("items", help="List items from a slot file")
     p_items.add_argument("file", help="Path to .mdrgslot file")
     p_items.add_argument("-e", "--equipped", action="store_true", help="Show equipped items only")
 
-    # diff
     p_diff = sub.add_parser("diff", help="Diff two slot files")
     p_diff.add_argument("file1", help="First .mdrgslot")
     p_diff.add_argument("file2", help="Second .mdrgslot")
 
-    # story
     p_story = sub.add_parser("story", help="Analyze storyTextIds_Comp")
     p_story.add_argument("file", help="Path to save.mdrg")
 
-    # slots
     p_slots = sub.add_parser("slots", help="List all save slots with progression")
     p_slots.add_argument("directory", nargs="?",
                          help="Path to Saves directory (default: auto-detected)")
 
-    # dump
     p_dump = sub.add_parser("dump", help="Pretty-print a file")
     p_dump.add_argument("file", help="Path to save file")
     p_dump.add_argument("--depth", type=int, default=3, help="Dump depth (default: 3)")
 
-    # extract
     p_extract = sub.add_parser("extract", help="Extract a field by name (recursive search)")
     p_extract.add_argument("file", help="Path to save file")
     p_extract.add_argument("field", help="Field name to extract")
 
-    # playerprefs
     p_pp = sub.add_parser("playerprefs", help="Parse PlayerPrefs.pp")
     p_pp.add_argument("file", help="Path to PlayerPrefs.pp")
 
-    # set — non-interactive value editing
     p_set = sub.add_parser("set", help="Set a value at a path (non-interactive)")
     p_set.add_argument("file", help="Path to save file")
-    p_set.add_argument("path", help="JSON path (e.g. money, flags[0].name, itemManager.items[0]._count)")
+    p_set.add_argument(
+        "path",
+        help="JSON path (e.g. money, flags[0].name, "
+             "itemManager.items[0]._count)",
+    )
     p_set.add_argument("value", help="New value (auto-detected: int/float/bool/string/null)")
 
-    # edit — interactive TUI
     p_edit = sub.add_parser("edit", help="Interactive TUI editor (curses)")
     p_edit.add_argument("file", help="Path to save file")
 
-    # inventory — rich item listing
     p_inv = sub.add_parser("inventory", help="Rich inventory listing (files or dirs)")
     p_inv.add_argument("files", nargs="*", help="Save file(s) or Saves directory"
                                              " (default: auto-detected)")
@@ -3002,11 +3101,9 @@ def main():
     p_inv.add_argument("--vanilla", action="store_true", help="Only vanilla items")
     p_inv.add_argument("-c", "--colors", type=int, help="Only items with N colour channels")
 
-    # slotsdb — what can go in a slot
     p_sdb = sub.add_parser("slotsdb", help="Show which items can go in each slot")
     p_sdb.add_argument("slot", nargs="?", help="Filter by slot name substring")
 
-    # find — search item names
     p_find = sub.add_parser("find", help="Search saves for an item name")
     p_find.add_argument("text", help="Text to search for")
     p_find.add_argument("targets", nargs="*", help="Save file(s) or Saves directory"
@@ -3014,7 +3111,6 @@ def main():
     p_find.add_argument("--deep", action="store_true",
                         help="Also match anywhere in the raw item JSON")
 
-    # color — view/set item colours
     p_col = sub.add_parser("color", help="View or set item colours (0-255)")
     p_col.add_argument("file", help="Path to .mdrgslot file")
     p_col.add_argument("item", help="Selector: @index, guid:xxxx, =Name, or a name substring")
@@ -3022,7 +3118,6 @@ def main():
                        help="Set channels (0-255, or 0.0-1.0)")
     p_col.add_argument("--all", action="store_true", help="Apply to every match")
 
-    # additem / delitem / dupe / equip
     p_add = sub.add_parser("additem", help="Add an item to the inventory")
     p_add.add_argument("file", help="Path to .mdrgslot file")
     p_add.add_argument("item", help="Item name (fuzzy) or id")
@@ -3050,7 +3145,6 @@ def main():
                       help="Slot to equip into (omit to unequip)")
     p_eq.add_argument("--all", action="store_true", help="Apply to every match")
 
-    # validate / backups / tree / export
     p_val = sub.add_parser("validate", help="Sanity-check a save file")
     p_val.add_argument("file", help="Path to .mdrgslot file")
 
@@ -3068,7 +3162,6 @@ def main():
     p_exp.add_argument("file", help="Path to .mdrgslot file")
     p_exp.add_argument("-o", "--out", help="Output path")
 
-    # where — platform / save-directory diagnostics
     p_where = sub.add_parser("where", help="Show platform info and the Saves dirs checked")
     p_where.add_argument("directory", nargs="?", help="Override directory to resolve")
 
@@ -3077,19 +3170,41 @@ def main():
         set_ascii_mode(True)
 
     cmds = {
-        "scan": cmd_scan, "info": cmd_info, "stats": cmd_stats,
-        "analyze": cmd_analyze, "gui": cmd_gui,
-        "flags": cmd_flags, "emails": cmd_emails, "items": cmd_items,
-        "diff": cmd_diff, "story": cmd_story, "slots": cmd_slots,
-        "dump": cmd_dump, "extract": cmd_extract, "playerprefs": cmd_playerprefs,
-        "set": cmd_set, "edit": cmd_edit,
-        "inventory": cmd_inventory, "slotsdb": cmd_slotsdb, "find": cmd_find,
-        "color": cmd_color, "additem": cmd_additem, "delitem": cmd_delitem,
-        "dupe": cmd_dupe, "equip": cmd_equip, "validate": cmd_validate,
-        "backups": cmd_backups, "tree": cmd_tree, "export": cmd_export,
-        "where": cmd_where,
+        "scan":         cmd_scan,
+        "info":         cmd_info,
+        "stats":        cmd_stats,
+        "analyze":      cmd_analyze,
+        "gui":          cmd_gui,
+        "flags":        cmd_flags,
+        "emails":       cmd_emails,
+        "items":        cmd_items,
+        "diff":         cmd_diff,
+        "story":        cmd_story,
+        "slots":        cmd_slots,
+        "dump":         cmd_dump,
+        "extract":      cmd_extract,
+        "playerprefs":  cmd_playerprefs,
+        "set":          cmd_set,
+        "edit":         cmd_edit,
+        "inventory":    cmd_inventory,
+        "slotsdb":      cmd_slotsdb,
+        "find":         cmd_find,
+        "color":        cmd_color,
+        "additem":      cmd_additem,
+        "delitem":      cmd_delitem,
+        "dupe":         cmd_dupe,
+        "equip":        cmd_equip,
+        "validate":     cmd_validate,
+        "backups":      cmd_backups,
+        "tree":         cmd_tree,
+        "export":       cmd_export,
+        "where":        cmd_where,
     }
-    sys.exit(cmds[args.command](args) or 0)
+
+    handler = cmds.get(args.command)
+    if handler is None:
+        parser.error(f"Unknown command: {args.command}")
+    sys.exit(handler(args) or 0)
 
 if __name__ == "__main__":
     main()
