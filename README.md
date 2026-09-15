@@ -45,24 +45,38 @@ folder**.
 `edit` is the interactive curses TUI editor. You can navigate, edit scalars,
 add/delete items, rename, clone, and undo/redo.
 
-Give it **no file argument** and it lists every save it can find — `.mdrgslot`
+Give it no file argument and it lists the saves it can find: `.mdrgslot`
 and `.mdrg` files plus their `.bak` backups, so you can pick one:
 
 ```bash
 python3 mdrg-savefile-editor.py edit
 ```
 
+It starts with your **main save folder**. The last row scans every other save
+folder it knows about, which is handy if you have a second install or a
+backup copy somewhere else.
+
 | Key | |
 |---|---|
 | `↑` `↓` / `j` `k` / `w` `s` | move |
 | `Enter` | open the highlighted file |
-| `TAB` | next save folder (if you have more than one) |
 | `/` | filter by filename |
 | `S` | sort by date (default, newest first) or by name |
 | `q` / `ESC` | cancel |
 
 Each row shows the file's size and last-modified date so you can spot the save
-you actually want. Backups are dimmed and usually not what you want to edit.
+you actually want. Backups are dimmed.
+
+**Backups.** Pressing `Enter` on a `.bak` asks what you want to do with it:
+
+| Choice | What happens |
+|---|---|
+| **edit** | open the backup in the editor like any other save |
+| **restore** | put it back as the live save and delete the `.bak` |
+| **cancel** | back to the list |
+
+A restore is not a one-way door: your current file is copied to
+`.prerestore` first, so the state you had before is still on disk.
 
 If no save directory exists at all, it prints the paths it checked instead of
 failing silently, so you can see where it looked and point it somewhere with

@@ -1772,13 +1772,110 @@ def _report_no_save_dir():
     print("  mdrg-savefile-editor.py edit /path/to/M7.mdrgslot", file=sys.stderr)
 
 
+_BAK = ".bak"
+
+
+def _is_bak(p):
+    return p.name.endswith(_BAK)
+
+
+def _live_of(bak):
+    """M20.mdrgslot.bak -> M20.mdrgslot"""
+    return bak.with_name(bak.name[: -len(_BAK)])
+
+
+def _restore_bak(bak):
+    """Put a .bak back as the live save, then remove the .bak
+
+    The live file is copied to .prerestore first, matching `backups --restore`,
+    so a restore is never a one-way door.
+    """
+    live = _live_of(bak)
+    if not live.name:
+        return False, "cannot work out which file this backs up"
+    try:
+        if live.exists():
+            keep = live.with_name(live.name + ".prerestore")
+            keep.write_bytes(live.read_bytes())
+        live.write_bytes(bak.read_bytes())
+        bak.unlink()
+    except OSError as exc:
+        return False, f"restore failed: {exc}"
+    return True, f"restored {live.name}  (previous kept as .prerestore)"
+
+
+def _kaomoji(text):
+    """Only return `text` if this console can actually render it"""
+    if not _UNI:
+        return ""
+    enc = (getattr(sys.stdout, "encoding", None) or "").lower()
+    if not enc:
+        return ""
+    try:
+        text.encode(enc)
+    except (UnicodeEncodeError, LookupError):
+        return ""
+    return text
+
+
+def _confirm_bak(stdscr, bak):
+    """Modal for a .bak file. Returns 'edit', 'restore' or None"""
+    import curses
+
+    opts = [
+        ("edit",    "open this backup in the editor"),
+        ("restore", "put it back as the live save, then delete the .bak"),
+        ("cancel",  "back to the list"),
+    ]
+    sel = 0
+    while True:
+        h, w = stdscr.getmaxyx()
+        stdscr.erase()
+        box_h = len(opts) + 4
+        top = max(0, (h - box_h) // 2)
+        try:
+            stdscr.addstr(top, 0, f" {bak.name} ".center(w - 1),
+                          curses.A_BOLD | curses.A_REVERSE)
+            stdscr.addstr(top + 1, 0,
+                          f" this is a backup of {_live_of(bak).name}"[: w - 1],
+                          curses.color_pair(1))
+        except curses.error:
+            pass
+        for i, (name, desc) in enumerate(opts):
+            line = f"  {'>' if i == sel else ' '} {name:<9} {desc}"
+            attr = (curses.color_pair(6) | curses.A_BOLD) if i == sel else 0
+            try:
+                stdscr.addstr(top + 3 + i, 0, line[: w - 1], attr)
+            except curses.error:
+                pass
+        try:
+            stdscr.addstr(min(h - 1, top + box_h), 0,
+                          " ↑↓:choose  Enter:confirm  ESC:cancel "[: w - 1],
+                          curses.color_pair(7))
+        except curses.error:
+            pass
+        stdscr.refresh()
+
+        k = stdscr.getch()
+        if k in (27, ord("q")):
+            return None
+        elif k in (curses.KEY_UP, ord("k")):
+            sel = (sel - 1) % len(opts)
+        elif k in (curses.KEY_DOWN, ord("j")):
+            sel = (sel + 1) % len(opts)
+        elif k in (curses.KEY_ENTER, ord("\n"), ord("\r")):
+            return opts[sel][0]
+
+
 def _pick_save(stdscr):
-    """Curses file picker over the platform save dirs. Returns Path or None"""
+    """Curses file picker. Shows the main save dir first; the last row scans
+    every candidate folder. Returns a Path, or None if cancelled."""
     import curses
 
     dirs = _candidate_dirs()
     if not dirs:
         return None
+    primary = dirs[0]
 
     try:
         curses.set_escdelay(25)
@@ -1799,16 +1896,24 @@ def _pick_save(stdscr):
         except Exception:
             pass
 
-    di = 0                  # index into dirs
     selected = 0
     scroll = 0
     by_name = False
+    scope_all = False
     filter_text = ""
     filter_prompt = False
     filter_buffer = ""
+    status = ""
 
-    def visible_rows():
-        rows = _scan_dir(dirs[di])
+    def files():
+        src = dirs if scope_all else [primary]
+        rows, seen = [], set()
+        for d in src:
+            for r in _scan_dir(d):
+                if r[0] in seen:
+                    continue
+                seen.add(r[0])
+                rows.append(r)
         rows.sort(key=(lambda r: r[0].name.lower()) if by_name
                   else (lambda r: -r[2]))
         if filter_text:
@@ -1816,10 +1921,21 @@ def _pick_save(stdscr):
             rows = [r for r in rows if f in r[0].name.lower()]
         return rows
 
+    def action_label():
+        if scope_all:
+            return "←  Back to just the main save folder"
+        extra = len(dirs) - 1
+        if extra <= 0:
+            return "⌕  Scan again"
+        return f"⌕  Scan all save folders  ({extra} more)"
+
     while True:
-        rows = visible_rows()
-        if selected >= len(rows):
-            selected = max(0, len(rows) - 1)
+        rows = files()
+        total = len(rows) + 1                     # +1 for the action row
+        if selected > total - 1:
+            selected = total - 1
+        if selected < 0:
+            selected = 0
         if selected < scroll:
             scroll = selected
 
@@ -1835,13 +1951,13 @@ def _pick_save(stdscr):
             continue
 
         # --- header -------------------------------------------------
-        title = " open a save "
         try:
-            stdscr.addstr(0, 0, title.center(w - 1),
+            stdscr.addstr(0, 0, " open a save ".center(w - 1),
                           curses.A_BOLD | curses.A_REVERSE)
         except curses.error:
             pass
-        loc = f" {di + 1}/{len(dirs)}  " + _shorten_path(dirs[di], w - 14)
+        where = "every save folder" if scope_all else _shorten_path(primary, w - 26)
+        loc = f" {where}"
         if by_name:
             loc += "   [name]"
         if filter_text:
@@ -1850,59 +1966,82 @@ def _pick_save(stdscr):
             stdscr.addstr(1, 0, loc[: w - 1], curses.color_pair(1))
         except curses.error:
             pass
-
-        list_top = 3
-        visible = h - list_top - 2
-
-        if not rows:
-            msg = ("  (no save files here — TAB for another folder)"
-                   if len(dirs) > 1 else "  (no save files here)")
+        if status:
             try:
-                stdscr.addstr(list_top, 0, msg[: w - 1], curses.color_pair(2))
+                stdscr.addstr(2, 0, f" {status}"[: w - 1], curses.color_pair(2))
             except curses.error:
                 pass
-        else:
-            end = min(scroll + visible, len(rows))
-            for i in range(scroll, end):
-                p, size, mtime = rows[i]
-                is_bak = p.name.endswith(".bak")
-                when = datetime.datetime.fromtimestamp(mtime).strftime("%m-%d %H:%M")
-                line = f" {p.name:<36} {_human_size(size):>7}  {when}"
-                attr = 0
-                if i == selected:
-                    attr = curses.color_pair(6) | curses.A_BOLD
-                elif is_bak:
-                    attr = curses.A_DIM
-                else:
-                    attr = curses.color_pair(2)
-                try:
-                    stdscr.addstr(list_top + i - scroll, 0, line[: w - 1], attr)
-                except curses.error:
-                    pass
-            if len(rows) > visible:
-                sb = f" {selected + 1}/{len(rows)} "
-                try:
-                    stdscr.addstr(list_top, w - len(sb) - 1, sb,
-                                  curses.color_pair(7))
-                except curses.error:
-                    pass
 
-        # --- filter prompt / footer ---------------------------------
+        list_top = 3
+        visible = max(1, h - list_top - 2)
+        if selected >= scroll + visible:
+            scroll = selected - visible + 1
+
+        # --- rows ----------------------------------------------------
+        if not rows:
+            if scope_all:
+                msg = "couldn't find any save files anywhere"
+                ka = _kaomoji("｡:ﾟ(｡ﹷ ‸ ﹷ ✿)")
+                if ka:
+                    msg += f"   {ka}"
+            else:
+                msg = "nothing in the main save folder — try the scan below"
+            try:
+                stdscr.addstr(list_top, 0, f"  {msg}"[: w - 1],
+                              curses.color_pair(2))
+            except curses.error:
+                pass
+
+        end = min(scroll + visible, len(rows))
+        for i in range(scroll, end):
+            p, size, mtime = rows[i]
+            when = datetime.datetime.fromtimestamp(mtime).strftime("%m-%d %H:%M")
+            folder = "" if not scope_all else f"{p.parent.name}/"
+            name = f"{folder}{p.name}"
+            line = f" {name:<40} {_human_size(size):>7}  {when}"
+            if i == selected:
+                attr = curses.color_pair(6) | curses.A_BOLD
+            elif _is_bak(p):
+                attr = curses.A_DIM
+            else:
+                attr = curses.color_pair(2)
+            try:
+                stdscr.addstr(list_top + i - scroll, 0, line[: w - 1], attr)
+            except curses.error:
+                pass
+
+        # --- action row (always last) --------------------------------
+        act_i = len(rows)
+        if scroll <= act_i < scroll + visible:
+            attr = (curses.color_pair(6) | curses.A_BOLD) if selected == act_i \
+                else curses.color_pair(1)
+            try:
+                stdscr.addstr(list_top + act_i - scroll, 0,
+                              f" {action_label()}"[: w - 1], attr)
+            except curses.error:
+                pass
+
+        if total > visible:
+            sb = f" {selected + 1}/{total} "
+            try:
+                stdscr.addstr(list_top, w - len(sb) - 1, sb, curses.color_pair(7))
+            except curses.error:
+                pass
+
+        # --- prompt / footer ------------------------------------------
         if filter_prompt:
             try:
                 stdscr.addstr(h - 2, 0, f" filter: {filter_buffer}_"[: w - 1],
                               curses.color_pair(2) | curses.A_BOLD)
-                stdscr.addstr(h - 1, 0,
-                              " Enter:apply  ESC:clear"[: w - 1],
+                stdscr.addstr(h - 1, 0, " Enter:apply  ESC:clear"[: w - 1],
                               curses.color_pair(7))
             except curses.error:
                 pass
         else:
-            footer = " ↑↓:move  Enter:open  /:filter  S:sort  q:quit "
-            if len(dirs) > 1:
-                footer = " ↑↓:move  Enter:open  TAB:folder  /:filter  S:sort  q:quit "
             try:
-                stdscr.addstr(h - 1, 0, footer[: w - 1], curses.color_pair(7))
+                stdscr.addstr(h - 1, 0,
+                              " ↑↓:move  Enter:open  /:filter  S:sort  q:quit "[: w - 1],
+                              curses.color_pair(7))
             except curses.error:
                 pass
 
@@ -1911,7 +2050,7 @@ def _pick_save(stdscr):
         if key == curses.KEY_RESIZE:
             continue
 
-        # --- filter prompt swallows keys ----------------------------
+        # --- filter prompt swallows keys ------------------------------
         if filter_prompt:
             if key in (curses.KEY_ENTER, ord("\n"), ord("\r")):
                 filter_text = filter_buffer
@@ -1934,25 +2073,40 @@ def _pick_save(stdscr):
         elif key in (curses.KEY_UP, ord("k"), ord("w")) and selected > 0:
             selected -= 1
         elif (key in (curses.KEY_DOWN, ord("j"), ord("s"))
-              and selected < len(rows) - 1):
+              and selected < total - 1):
             selected += 1
-        elif key == curses.KEY_PGUP:
+        elif key in (curses.KEY_PPAGE,):
             selected = max(0, selected - visible)
-        elif key == curses.KEY_PGDN:
-            selected = min(max(0, len(rows) - 1), selected + visible)
+        elif key in (curses.KEY_NPAGE,):
+            selected = min(total - 1, selected + visible)
         elif key == curses.KEY_HOME or key == ord("g"):
             selected = 0
         elif key == curses.KEY_END or key == ord("G"):
-            selected = max(0, len(rows) - 1)
+            selected = total - 1
         elif key == ord("S"):
             by_name = not by_name
             selected = scroll = 0
-        elif key == 9 and len(dirs) > 1:          # TAB
-            di = (di + 1) % len(dirs)
-            selected = scroll = 0
+        elif key == 9 and len(dirs) > 1:            # TAB jumps to the scan row
+            selected = len(rows)
         elif key in (curses.KEY_ENTER, ord("\n"), ord("\r"), curses.KEY_RIGHT):
-            if rows:
-                return rows[selected][0]
+            if selected == act_i:
+                # the action row
+                scope_all = not scope_all
+                selected = scroll = 0
+                status = "scanned every folder" if scope_all else "main folder"
+                continue
+            if not rows:
+                continue
+            chosen = rows[selected][0]
+            if _is_bak(chosen):
+                action = _confirm_bak(stdscr, chosen)
+                if action == "edit":
+                    return chosen
+                if action == "restore":
+                    ok, msg = _restore_bak(chosen)
+                    status = msg
+                continue
+            return chosen
 
 
 def cmd_edit(args):
