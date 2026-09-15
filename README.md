@@ -9,13 +9,13 @@ and macOS. (hopefully)
 ## Quick start
 
 ```bash
-python3 mdrg-cli.py where               # show platform + detected save dirs
-python3 mdrg-cli.py slots               # list every save slot with progression
-python3 mdrg-cli.py inventory           # rich inventory view of a save
-python3 mdrg-cli.py edit M7.mdrgslot    # interactive TUI editor
+python3 mdrg-savefile-editor.py where               # show platform + detected save dirs
+python3 mdrg-savefile-editor.py slots               # list every save slot with progression
+python3 mdrg-savefile-editor.py inventory           # rich inventory view of a save
+python3 mdrg-savefile-editor.py edit M7.mdrgslot    # interactive TUI editor
 ```
 
-On Windows use `mdrg.cmd scan` instead, or `py mdrg-cli.py scan`.
+On Windows use `mdrg-savefile-editor.cmd scan` instead, or `py mdrg-savefile-editor.py scan`.
 
 No save directory argument is needed — the tool auto-detects it per platform
 and, when you name a specific file, always operates on **that file's own
@@ -42,7 +42,7 @@ folder**.
 | `edit` | Interactive curses TUI editor |
 | `where` | Platform info and Saves directories checked |
 
-Run `python3 mdrg-cli.py --help` for the full list.
+Run `python3 mdrg-savefile-editor.py --help` for the full list.
 
 ## Requirements
 
@@ -56,25 +56,28 @@ Every write takes a `.bak` backup **before** modifying anything. Just in case my
 
 `tests/test_roundtrip.py` enforces this on every run.
 
-## Layout
+## Repo contents
+
+Everything in this list is tracked and published:
 
 ```
-mdrg-cli.py            the editor
-item_ids.txt           gameID -> ItemEnum name   (required at runtime)
-items_by_slot.json     slot -> allowed items     (optional, powers slotsdb)
-mdrg.cmd               Windows launcher
-docs/                  reverse-engineering notes on the save format
+mdrg-savefile-editor.py    the editor (CLI subcommands + curses TUI + tkinter GUI)
+mdrg-savefile-editor.cmd   Windows launcher
+item_ids.txt               gameID -> ItemEnum name  (required at runtime)
+items_by_slot.json         slot -> allowed items    (optional; powers `slotsdb`)
+docs/                      reverse-engineering notes on the save format
+tests/                     round-trip and TUI test suites
+README.md
+.gitignore
 ```
 
-## Tests
+Deliberately **not** published — kept locally only and git-ignored:
 
-```bash
-cd tests
-python3 test_roundtrip.py     # colour round-trip + LF/BOM regression guard
-python3 test_tui.py           # drives the TUI in a pty, ~43 key steps
 ```
-
-Both need a save at `M20.mdrgslot` in the standard save directory.
+tools/    the scripts that regenerate item_ids.txt from the game assembly.
+          Only needed if the game updates and adds or renames items.
+          See tools/README.md (local) for the pipeline.
+```
 
 ## Environment variables
 

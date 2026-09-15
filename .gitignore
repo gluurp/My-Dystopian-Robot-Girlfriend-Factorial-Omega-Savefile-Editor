@@ -14,3 +14,6 @@ desktop.ini
 *.orig
 *.rej
 *~
+
+# Regeneration toolchain - local only, not published
+tools/

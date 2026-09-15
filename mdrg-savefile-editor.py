@@ -1,21 +1,28 @@
 #!/usr/bin/env python3
 """
-mdrg-cli — CLI tool to inspect / rip apart My Dystopian Robot Girlfriend save files.
+mdrg-savefile-editor — inspect and edit My Dystopian Robot Girlfriend save files.
+
+Three frontends over one parser:
+
+  CLI     subcommands (scan, stats, inventory, color, additem, ...)
+  TUI     `edit`  — full-screen curses editor
+  GUI     `gui`   — small tkinter analyzer
 
 Handles both formats:
   - Current (0.97.x): save.mdrg (registry) + *.mdrgslot (game state) + PlayerPrefs.pp
   - Old (0.80 beta): save<timestamp>.mdrg with inline savedata
 
-No external dependencies — stdlib only.
+No external dependencies — stdlib only. (`windows-curses` is needed for the
+TUI on Windows; everything else works without it.)
 
 Usage examples:
-  mdrg-cli.py scan ./Saves
-  mdrg-cli.py stats A5.mdrgslot
-  mdrg-cli.py flags A1.mdrgslot
-  mdrg-cli.py diff A1.mdrgslot A10.mdrgslot
-  mdrg-cli.py dump save.mdrg --depth 2
-  mdrg-cli.py story save.mdrg
-  mdrg-cli.py slots ./Saves
+  mdrg-savefile-editor.py scan ./Saves
+  mdrg-savefile-editor.py slots ./Saves
+  mdrg-savefile-editor.py inventory M20.mdrgslot
+  mdrg-savefile-editor.py color M20.mdrgslot --list
+  mdrg-savefile-editor.py diff A1.mdrgslot A10.mdrgslot
+  mdrg-savefile-editor.py edit M20.mdrgslot
+  mdrg-savefile-editor.py where
 """
 
 import argparse
@@ -643,7 +650,7 @@ def cmd_scan(args):
     directory = resolve_saves_dir(getattr(args, "directory", None))
     if not directory.is_dir():
         print(f"Error: {directory} is not a directory", file=sys.stderr)
-        print("       run 'mdrg-cli where' to see the directories checked,",
+        print("       run 'mdrg-savefile-editor where' to see the directories checked,",
               file=sys.stderr)
         print("       or set MDRG_GAME_DIR to your game data folder.", file=sys.stderr)
         sys.exit(1)
@@ -1114,7 +1121,7 @@ def cmd_slots(args):
     directory = resolve_saves_dir(getattr(args, "directory", None))
     if not directory.is_dir():
         print(f"Error: {directory} is not a directory", file=sys.stderr)
-        print("       run 'mdrg-cli where' to see the directories checked.",
+        print("       run 'mdrg-savefile-editor where' to see the directories checked.",
               file=sys.stderr)
         sys.exit(1)
 
@@ -1812,7 +1819,7 @@ def _interactive_edit(stdscr, data, path, save_root=None):
         pos = f" [{selected + 1}/{len(children)}]" if children else " [0/0]"
         filt = f"  /{filter_text}" if filter_text else ""
         try:
-            hdr = f" mdrg-cli edit {DASH} {path.name}{pos}{filt} "
+            hdr = f" mdrg-savefile-editor edit {DASH} {path.name}{pos}{filt} "
             stdscr.addstr(0, 0, hdr[: w - 1].ljust(w - 1), curses.A_BOLD | curses.A_REVERSE)
         except curses.error:
             pass
@@ -2902,7 +2909,7 @@ def collect_files(inputs):
 
 def main():
     parser = argparse.ArgumentParser(
-        prog="mdrg-cli",
+        prog="mdrg-savefile-editor",
         description="Inspect / rip apart My Dystopian Robot Girlfriend save files",
         epilog="See https://github.com/ for updates. No external dependencies required.",
     )
