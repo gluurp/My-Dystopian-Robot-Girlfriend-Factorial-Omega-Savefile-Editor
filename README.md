@@ -1,11 +1,10 @@
 # MDRG Save File Editor
 
 A cross-platform save editor for My Dystopian Robot Girlfriend (!Ω Factorial Omega).
-Three frontends over one parser: command-line subcommands, a full-screen curses
-TUI, and a small tkinter GUI.
+It has a CLI and a full-screen curses TUI.
 
-Standard library only — no dependencies for editing. Works on Linux, Windows
-and macOS.
+Standard library only, so no dependencies for editing. Works on Linux, Windows
+and macOS. (I ACTUALLY HAVENT TESTED IT ON WINDOWS OR MACOS... I was too lazy to spin up a VM so SOMEONE LMK IF ITS BROKEN I'll fix it super fast dw)
 
 ## Quick start
 
@@ -13,7 +12,8 @@ and macOS.
 python3 mdrg-savefile-editor.py where            # platform + detected save dirs
 python3 mdrg-savefile-editor.py slots            # all save slots + progression
 python3 mdrg-savefile-editor.py inventory        # rich inventory view of a save
-python3 mdrg-savefile-editor.py edit M7.mdrgslot # interactive TUI editor
+python3 mdrg-savefile-editor.py edit             # pick a save from a list
+python3 mdrg-savefile-editor.py edit M7.mdrgslot # ...or name one directly
 ```
 
 On Windows use `mdrg-savefile-editor.cmd scan` instead, or `py mdrg-savefile-editor.py scan`.
@@ -42,10 +42,31 @@ folder**.
 
 ### Editing
 
-| Command | Purpose |
+`edit` is the interactive curses TUI editor. You can navigate, edit scalars,
+add/delete items, rename, clone, and undo/redo.
+
+Give it **no file argument** and it lists every save it can find — `.mdrgslot`
+and `.mdrg` files plus their `.bak` backups, so you can pick one:
+
+```bash
+python3 mdrg-savefile-editor.py edit
+```
+
+| Key | |
 |---|---|
-| `edit` | Interactive curses TUI editor — navigate, edit scalars, add/delete items, rename, clone, undo/redo |
-| `gui` | Small tkinter analyzer window |
+| `↑` `↓` / `j` `k` / `w` `s` | move |
+| `Enter` | open the highlighted file |
+| `TAB` | next save folder (if you have more than one) |
+| `/` | filter by filename |
+| `S` | sort by date (default, newest first) or by name |
+| `q` / `ESC` | cancel |
+
+Each row shows the file's size and last-modified date so you can spot the save
+you actually want. Backups are dimmed and usually not what you want to edit.
+
+If no save directory exists at all, it prints the paths it checked instead of
+failing silently, so you can see where it looked and point it somewhere with
+`MDRG_SAVES_DIR`.
 
 ### Data manipulation
 
@@ -61,7 +82,7 @@ Run `python3 mdrg-savefile-editor.py --help` for the full list.
 ## Requirements
 
 - Python 3.8+
-- `pip install windows-curses` — **Windows only**, for the edit TUI.
+- `pip install windows-curses` **Windows only**, for the edit TUI.
   Everything else works without it.
 
 ## Safety
@@ -70,7 +91,7 @@ Every write takes a `.bak` backup **before** anything is modified, in case the
 tool or the user mangles something. List and restore them with:
 
 ```bash
-python3 mdrg-savefile-editor.py backups M20.mdrgslot
+python3 mdrg-savefile-editor.py backups M20.mdrgslot # replace M20 with whatever slot the name is btw ofc
 python3 mdrg-savefile-editor.py backups M20.mdrgslot --restore
 ```
 
@@ -78,25 +99,7 @@ Save files use bare LF line endings and no BOM, and the tool preserves that
 exactly — a save with no edits comes back byte-identical. `tests/test_roundtrip.py`
 asserts this on every run.
 
-## Tests
-
-```bash
-cd tests
-python3 test_roundtrip.py    # colour round-trip + line-ending/BOM guard
-python3 test_tui.py          # drives the TUI in a pty, ~43 key presses
-```
-
-Both need a save file to run against — **any slot works**, M20 is not special.
-They auto-detect one in your platform's standard saves directory, or you can
-point at a specific slot:
-
-```bash
-python3 test_roundtrip.py /path/to/A1.mdrgslot
-MDRG_TEST_SAVE=/path/to/A1.mdrgslot python3 test_tui.py
-```
-
-Your real saves are never modified: each test copies the slot to a temporary
-directory and works on the copy.
+Your save isn't written to until you save it. It's copied to a temp dir
 
 ## Environment variables
 
@@ -107,7 +110,7 @@ directory and works on the copy.
 | `MDRG_ASCII=1` | Plain-ASCII output |
 | `MDRG_UNICODE=1` | Force Unicode glyphs |
 
-## Save locations
+## Save locations (usually idk)
 
 | OS | Path |
 |---|---|

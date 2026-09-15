@@ -1693,27 +1693,272 @@ def edit_prefill(parent, key, value):
     return repr(value)
 
 
+def _human_size(n):
+    """Compact file size for the picker: 812B / 24K / 1.2M"""
+    if n < 1024:
+        return f"{n}B"
+    if n < 1024 * 1024:
+        return f"{n / 1024:.0f}K"
+    return f"{n / (1024 * 1024):.1f}M"
+
+
+def _save_dir_candidates():
+    """Every directory the editor would consider, in priority order
+
+    Mirrors resolve_saves_dir(): MDRG_SAVES_DIR wins outright, otherwise the
+    platform candidates apply. candidate_save_dirs() alone does NOT include
+    the env override, so it cannot be used directly here
+    """
+    env = os.environ.get("MDRG_SAVES_DIR")
+    if env:
+        return [Path(env).expanduser()]
+    return candidate_save_dirs()
+
+
+def _candidate_dirs():
+    """Save directories that actually exist, best first, de-duplicated"""
+    seen, out = set(), []
+    for d in _save_dir_candidates():
+        try:
+            if d.is_dir() and d not in seen:
+                seen.add(d)
+                out.append(d)
+        except OSError:
+            continue
+    return out
+
+
+def _shorten_path(p, width):
+    """Trim a path to `width`, keeping the informative tail visible"""
+    s = str(p)
+    home = str(Path.home())
+    if s.startswith(home):
+        s = "~" + s[len(home):]
+    if len(s) <= width:
+        return s
+    if width <= 1:
+        return s[-width:] if width else ""
+    return "\u2026" + s[-(width - 1):]
+
+
+def _scan_dir(d):
+    """[(path, size, mtime), ...] for the file kinds the editor can open"""
+    rows, seen = [], set()
+    for pat in ("*.mdrgslot", "*.mdrgslot.bak", "*.mdrg", "*.mdrg.bak"):
+        for p in sorted(d.glob(pat)):
+            if p in seen or not p.is_file():
+                continue
+            seen.add(p)
+            try:
+                st = p.stat()
+            except OSError:
+                continue
+            rows.append((p, st.st_size, st.st_mtime))
+    return rows
+
+
+def _report_no_save_dir():
+    """Explain which directories were checked, in the style of `where`"""
+    print("Error: no save directory found.", file=sys.stderr)
+    print("\nChecked:", file=sys.stderr)
+    for c in _save_dir_candidates():
+        try:
+            mark = "FOUND" if c.is_dir() else "     "
+        except OSError:
+            mark = "     "
+        print(f"  [{mark}] {c}", file=sys.stderr)
+    print("\nPoint it at yours with MDRG_SAVES_DIR, or name a file directly:",
+          file=sys.stderr)
+    print("  mdrg-savefile-editor.py edit /path/to/M7.mdrgslot", file=sys.stderr)
+
+
+def _pick_save(stdscr):
+    """Curses file picker over the platform save dirs. Returns Path or None"""
+    import curses
+
+    dirs = _candidate_dirs()
+    if not dirs:
+        return None
+
+    try:
+        curses.set_escdelay(25)
+    except AttributeError:
+        pass
+    curses.curs_set(0)
+    stdscr.keypad(True)
+    stdscr.nodelay(False)
+
+    for cp, fg, bg in [
+        (1, curses.COLOR_CYAN,    curses.COLOR_BLACK),
+        (2, curses.COLOR_YELLOW,  curses.COLOR_BLACK),
+        (6, curses.COLOR_BLACK,   curses.COLOR_WHITE),
+        (7, curses.COLOR_BLUE,    curses.COLOR_BLACK),
+    ]:
+        try:
+            curses.init_pair(cp, fg, bg)
+        except Exception:
+            pass
+
+    di = 0                  # index into dirs
+    selected = 0
+    scroll = 0
+    by_name = False
+    filter_text = ""
+    filter_prompt = False
+    filter_buffer = ""
+
+    def visible_rows():
+        rows = _scan_dir(dirs[di])
+        rows.sort(key=(lambda r: r[0].name.lower()) if by_name
+                  else (lambda r: -r[2]))
+        if filter_text:
+            f = filter_text.lower()
+            rows = [r for r in rows if f in r[0].name.lower()]
+        return rows
+
+    while True:
+        rows = visible_rows()
+        if selected >= len(rows):
+            selected = max(0, len(rows) - 1)
+        if selected < scroll:
+            scroll = selected
+
+        stdscr.erase()
+        h, w = stdscr.getmaxyx()
+        if h < 7 or w < 34:
+            try:
+                stdscr.addstr(0, 0, "Terminal too small")
+                stdscr.refresh()
+            except curses.error:
+                pass
+            stdscr.getch()
+            continue
+
+        # --- header -------------------------------------------------
+        title = " open a save "
+        try:
+            stdscr.addstr(0, 0, title.center(w - 1),
+                          curses.A_BOLD | curses.A_REVERSE)
+        except curses.error:
+            pass
+        loc = f" {di + 1}/{len(dirs)}  " + _shorten_path(dirs[di], w - 14)
+        if by_name:
+            loc += "   [name]"
+        if filter_text:
+            loc += f"   /{filter_text}"
+        try:
+            stdscr.addstr(1, 0, loc[: w - 1], curses.color_pair(1))
+        except curses.error:
+            pass
+
+        list_top = 3
+        visible = h - list_top - 2
+
+        if not rows:
+            msg = ("  (no save files here — TAB for another folder)"
+                   if len(dirs) > 1 else "  (no save files here)")
+            try:
+                stdscr.addstr(list_top, 0, msg[: w - 1], curses.color_pair(2))
+            except curses.error:
+                pass
+        else:
+            end = min(scroll + visible, len(rows))
+            for i in range(scroll, end):
+                p, size, mtime = rows[i]
+                is_bak = p.name.endswith(".bak")
+                when = datetime.datetime.fromtimestamp(mtime).strftime("%m-%d %H:%M")
+                line = f" {p.name:<36} {_human_size(size):>7}  {when}"
+                attr = 0
+                if i == selected:
+                    attr = curses.color_pair(6) | curses.A_BOLD
+                elif is_bak:
+                    attr = curses.A_DIM
+                else:
+                    attr = curses.color_pair(2)
+                try:
+                    stdscr.addstr(list_top + i - scroll, 0, line[: w - 1], attr)
+                except curses.error:
+                    pass
+            if len(rows) > visible:
+                sb = f" {selected + 1}/{len(rows)} "
+                try:
+                    stdscr.addstr(list_top, w - len(sb) - 1, sb,
+                                  curses.color_pair(7))
+                except curses.error:
+                    pass
+
+        # --- filter prompt / footer ---------------------------------
+        if filter_prompt:
+            try:
+                stdscr.addstr(h - 2, 0, f" filter: {filter_buffer}_"[: w - 1],
+                              curses.color_pair(2) | curses.A_BOLD)
+                stdscr.addstr(h - 1, 0,
+                              " Enter:apply  ESC:clear"[: w - 1],
+                              curses.color_pair(7))
+            except curses.error:
+                pass
+        else:
+            footer = " ↑↓:move  Enter:open  /:filter  S:sort  q:quit "
+            if len(dirs) > 1:
+                footer = " ↑↓:move  Enter:open  TAB:folder  /:filter  S:sort  q:quit "
+            try:
+                stdscr.addstr(h - 1, 0, footer[: w - 1], curses.color_pair(7))
+            except curses.error:
+                pass
+
+        stdscr.refresh()
+        key = stdscr.getch()
+        if key == curses.KEY_RESIZE:
+            continue
+
+        # --- filter prompt swallows keys ----------------------------
+        if filter_prompt:
+            if key in (curses.KEY_ENTER, ord("\n"), ord("\r")):
+                filter_text = filter_buffer
+                filter_prompt = False
+                selected = scroll = 0
+            elif key == 27:
+                filter_buffer = ""
+                filter_prompt = False
+            elif key in (curses.KEY_BACKSPACE, 127, 8):
+                filter_buffer = filter_buffer[:-1]
+            elif 32 <= key < 127:
+                filter_buffer += chr(key)
+            continue
+
+        if key == ord("/"):
+            filter_prompt = True
+            filter_buffer = filter_text
+        elif key in (ord("q"), 27):
+            return None
+        elif key in (curses.KEY_UP, ord("k"), ord("w")) and selected > 0:
+            selected -= 1
+        elif (key in (curses.KEY_DOWN, ord("j"), ord("s"))
+              and selected < len(rows) - 1):
+            selected += 1
+        elif key == curses.KEY_PGUP:
+            selected = max(0, selected - visible)
+        elif key == curses.KEY_PGDN:
+            selected = min(max(0, len(rows) - 1), selected + visible)
+        elif key == curses.KEY_HOME or key == ord("g"):
+            selected = 0
+        elif key == curses.KEY_END or key == ord("G"):
+            selected = max(0, len(rows) - 1)
+        elif key == ord("S"):
+            by_name = not by_name
+            selected = scroll = 0
+        elif key == 9 and len(dirs) > 1:          # TAB
+            di = (di + 1) % len(dirs)
+            selected = scroll = 0
+        elif key in (curses.KEY_ENTER, ord("\n"), ord("\r"), curses.KEY_RIGHT):
+            if rows:
+                return rows[selected][0]
+
+
 def cmd_edit(args):
-    """Interactive TUI editor (curses)"""
-    path = Path(args.file)
-    data = load_data(path)
-    edit_data = data
-    if file_type(path.name) == "old_save":
-        records = analysis_records(path, data)
-        if not records:
-            print(f"Error: {path.name} has no embedded gameplay data", file=sys.stderr)
-            sys.exit(1)
-        if len(records) > 1:
-            print(
-            f"Error: {path.name} contains multiple saves; "
-            f"edit is not ambiguous-safe",
-            file=sys.stderr,
-        )
-            sys.exit(1)
-        edit_data = records[0]
+    """Interactive TUI editor (curses). With no file, opens a picker"""
     try:
         import curses
-        curses.wrapper(_interactive_edit, edit_data, path, data)
     except ImportError:
         print("Error: the interactive editor needs the 'curses' module.", file=sys.stderr)
         if IS_WINDOWS:
@@ -1723,6 +1968,38 @@ def cmd_edit(args):
             print("  Linux:   sudo apt install python3-curses  (usually preinstalled)",
                   file=sys.stderr)
         sys.exit(1)
+
+    if args.file:
+        path = Path(args.file)
+    else:
+        # No file named: offer the save dirs instead of erroring out.
+        if not _candidate_dirs():
+            _report_no_save_dir()
+            sys.exit(1)
+        if not (sys.stdin.isatty() and sys.stdout.isatty()):
+            print("Error: the file picker needs an interactive terminal.",
+                  file=sys.stderr)
+            print("       name a file instead:  edit /path/to/M7.mdrgslot",
+                  file=sys.stderr)
+            sys.exit(1)
+        path = curses.wrapper(_pick_save)
+        if path is None:
+            sys.exit(0)          # cancelled, or nothing to show
+
+    data = load_data(path)
+    edit_data = data
+    if file_type(path.name) == "old_save":
+        records = analysis_records(path, data)
+        if not records:
+            print(f"Error: {path.name} has no embedded gameplay data", file=sys.stderr)
+            sys.exit(1)
+        if len(records) > 1:
+            print(f"Error: {path.name} contains multiple saves; edit is not "
+                  f"ambiguous-safe", file=sys.stderr)
+            sys.exit(1)
+        edit_data = records[0]
+    try:
+        curses.wrapper(_interactive_edit, edit_data, path, data)
     except KeyboardInterrupt:
         pass
 
@@ -3053,7 +3330,8 @@ def main():
     p_set.add_argument("value", help="New value (auto-detected: int/float/bool/string/null)")
 
     p_edit = sub.add_parser("edit", help="Interactive TUI editor (curses)")
-    p_edit.add_argument("file", help="Path to save file")
+    p_edit.add_argument("file", nargs="?",
+                        help="Path to save file (omit to pick from the save dir)")
 
     p_inv = sub.add_parser("inventory", help="Rich inventory listing (files or dirs)")
     p_inv.add_argument("files", nargs="*", help="Save file(s) or Saves directory"
