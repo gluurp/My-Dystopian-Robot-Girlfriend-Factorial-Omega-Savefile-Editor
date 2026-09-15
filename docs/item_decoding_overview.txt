@@ -1,0 +1,629 @@
+===============================================================================
+ MDRG SAVE / ITEM FORMAT — WORKING NOTES AND EDITOR GUIDE
+===============================================================================
+Project : My Dystopian Robot Girlfriend (IL2CPP, Unity 6000.3.8f1)
+Date    : 2026-09-15
+Purpose : Everything needed to READ AND WRITE save files for a save editor.
+Scope   : ITEMS ONLY.
+
+STATUS
+  [x] item id -> name            SOLVED (Il2CppGameItems.ItemEnum)
+  [x] slot -> items              SOLVED (items_by_slot.txt, 46 groups)
+  [x] mod vs vanilla namespace   SOLVED (_gameId is a PAIR)
+  [x] colour channels 0..1 floats understood, editable as 0..255
+  [ ] localized display names    NOT keyed to ItemEnum yet (section 10)
+
+===============================================================================
+ 1. SAVE LOCATION AND FILES
+===============================================================================
+
+~/.config/unity3d/IncontinentCell/My Dystopian Robot Girlfriend/Saves/
+  save.mdrg            registry / player metadata
+  PlayerPrefs.pp       preferences
+  A1..A29.mdrgslot     auto slots   (game state JSON)
+  M1..M20.mdrgslot     manual slots (game state JSON)
+  *.mdrgslot.bak       backups written by the CLI before every save
+
+Current format is plain JSON. Older 0.80-beta saves are gzip-compressed with an
+inline `savedata` string. 50 .mdrgslot files were analysed for this document.
+
+The directory shown above is the Linux path. Windows and macOS use different
+locations - see section 12.
+
+===============================================================================
+ 2. THE ITEM ID TABLE
+===============================================================================
+
+`_gameId._id` (for vanilla items) is a value of the enum
+**Il2CppGameItems.ItemEnum**, found in the decompiled IL2CPP assembly:
+
+    MelonLoader/Il2CppAssemblies/Il2CppGameAssembly.dll
+
+Method: `extract_itemenum.py` (uses the `dnfile` .NET metadata parser) reads the
+TypeDef `ItemEnum` and its field constants -> 352 members, e.g.
+
+       1  CatEars            13018  Manicure          1000001  SneakerL
+       6  CatTail            13019  Pedicure          1000002  SneakerR
+   12000  StockingL          13028  NavelPiercing     2030000  ColorfulSoap
+   12001  StockingR          2005015  Sugar            2000004  Bluegill
+
+*** EXTRACTION QUIRK (IMPORTANT) ***
+  dnfile returns field constants offset by one: the numeric value printed on
+  line L belongs to the NAME on line L-1. `fix_enum.py` corrects this and
+  verifies it against 8 anchors taken from real saves:
+      Manicure=13018, Pedicure=13019, NavelPiercing=13028, NipplePiercingL=13029,
+      SneakerL=1000001, SneakerR=1000002, StockingL=12000, StockingR=12001
+  All 8 pass. Do not "fix" this without re-running the anchors.
+
+ID BANDS (observable structure):
+      1-9      body basics (CatEars, BasicLegL/R, BasicArmL/R, CatTail...)
+     50-203    Hypercamo / VolksAuto / Experimental variants of the above
+    500-1009   teeth, libido items, hypercamo limb/skin/eye variants
+   1200-1506   hair/skin recolours, hologram, personality modules, body-size
+               modules, and the "Default*" items (DefaultSkin, DefaultHair...)
+   2000-2012   food (canned, sweets, bread, ...)
+   3000-4004   consumables / drugs
+   5000        PlainShirt
+  10000-10134  shirts (10000-10133) then PlainPanties (10134)
+  11000-11300  panties (+bikini sets)
+  12000-12015  stockings and socks (L/R alternating)
+  12500-12507  stocking PAIRS
+  13000-13031  accessories: bows, chokers, glasses, makeup, piercings, nails
+  14000-14003  bras
+  15000-15002  lower body (PleatedSkirt, BaggyPants, MiniSkirt)
+  16000-16005  shoes (PlainSneaker*, ClassyShoe*)
+  17000-17131  hoodies (Outer)
+  18000-18001  VintageDress, SlipDress, PixelGlasses
+ 1000000-1000003  SneakerL/R/Pair, BasicFishingRod
+ 2000000+     fishing rods, fish, bait, trash, ingredients, cooked dishes, soaps
+ 3000000-3000003  event decorations
+ 4000000-4000003  catalogue / Landlord stove
+
+Generated data file consumed by the CLI: **item_ids.txt** (`<id><TAB><name>`).
+
+===============================================================================
+ 3. ITEM RECORD SCHEMA  (itemManager.items[])
+===============================================================================
+
+17 keys, identical schema in items[] and in sets[].EquippedItems[].
+
+  UniqueItemGuid            dict  {"serializedGuid": "<uuid>"}   *** KEY ***
+  _gameId                   dict  {"_guid":{"serializedGuid":""}, "_id": <ItemEnum>}
+  _count                    int
+  _quality                  float
+  _equipedSlot              string
+  _colors                   list  [{r,g,b,a}, ...]
+  IsFavourite               bool
+  SourceItemsUniqueGuids    list  [{"serializedGuid": "<uuid>"}, ...]
+  I                         list  [{"K": "<name>", "V": <int>}, ...]
+  F                         list  [{"K": "<name>", "V": <float>}, ...]
+  S / DI / IM               list  (always empty)
+  _additionalData           string (always "")
+  AdditionalDataSlots       list  (always empty)
+  itemLocation              int   (almost always 0)
+  _id                       int   (ALWAYS -1)
+
+--- IDENTITY ------------------------------------------------------------------
+  PRIMARY KEY is `UniqueItemGuid.serializedGuid`. The only stable handle.
+  DEAD: `_id` (always -1).
+
+  *** `_gameId` IS A PAIR: (modGuid, id) - NOT just an integer ***
+      _gameId._guid.serializedGuid  EMPTY ""  -> VANILLA; _id indexes ItemEnum
+      _gameId._guid.serializedGuid  NON-EMPTY -> MOD item; _id is in that MOD's
+                                                 OWN namespace and does NOT refer
+                                                 to the ItemEnum entry with the
+                                                 same number.
+
+  Observed namespaces across 50 saves:
+      (empty)                              12,544 records, 156 ids  = vanilla
+      26e1a9a4-a364-4a10-8710-b9573819a6cf   113 records,   8 ids  (ids 0-7)
+      c3eeab95-1fc9-4735-b47e-2411d99814f1   102 records,   6 ids  = "Yet another
+                                             seamless mod" (ids 0-5)
+  These GUIDs correspond to folders in the game's ModsWorking directory.
+  Mod names can be resolved from `sets[].UsedMods[]`.
+
+  *** THIS CAUSED A REAL MISREAD. ***
+  An earlier pass ignored `_gameId._guid` and reported two things that looked
+  like corruption:
+     * "gameID 1 = CatEars is equipped in the ArmR slot in every save"
+     * "gameID 4 appears as both Skin and ArmL depending on the save"
+  Both are namespace collisions. Those records belong to "Yet another seamless
+  mod", whose own id 1 is an ArmR item and id 4 is a Skin item. Vanilla id 1
+  (CatEars) and vanilla id 4 (BasicArmL) are separate items entirely.
+
+  => ALWAYS split by `_gameId._guid` before attributing a name or slot.
+
+===============================================================================
+ 4. FIELD USAGE CENSUS  (12,759 records / 50 saves)
+===============================================================================
+
+  _colors                   11,109 87%   1-5 RGBA entries (colour channels)
+  IsFavourite                2,337 18%
+  _equipedSlot               1,840 14%
+  SourceItemsUniqueGuids     1,790 14%   crafting/mod provenance
+  I                            324  3%   int toggles: Front/FrontClippedUp/Side/
+                                        Back/Ahoge/Braid (values 0/1)
+  F                             92  1%   morphs: calfSize, boobSize, feetLength,
+                                        feetWidth, assSize, thighSize
+  itemLocation                  29  0%
+  S DI IM _additionalData AdditionalDataSlots  ALL DEAD (0%)
+  _id                       12,759 100%  always -1
+
+  _colors list-length distribution:
+      0:1650   1:7228   2:2611   3:1034   5:236
+  This is how "the same item appears many times" - one type, many colours.
+  Each entry is {"r":0..1, "g":0..1, "b":0..1, "a":0..1} as FLOATS.
+
+--- _quality ------------------------------------------------------------------
+  Per-RECORD condition/quality multiplier, normal range 0.42 .. 1.52.
+  One save can hold several values for one type. Evaluated per namespace too:
+  the "gameID 0 quality = 2000.0" outlier is a VANILLA id-0 record, exactly one
+  per save, with no colours and no slot -> a SENTINEL, not a real stat.
+  Treat 2000.0 as "unset" and never display it as a stat.
+
+--- _count --------------------------------------------------------------------
+  NOT always a quantity. For equipped items it is ALWAYS 0 or 1, never more.
+  Only ~8 records per save have _count > 1 and those always have no colours and
+  no slot. Some values are identical in every save (4000->28, 4001->29,
+  4002->28, 4003->43, 5000->136) = scaffold entries, not player data.
+  Real stackables look like 4, 5, 28, 29, 43, 44, 89 (food, bait, ingredients).
+
+===============================================================================
+ 5. OUTFIT SETS  (itemManager.sets[])
+===============================================================================
+
+    sets[] = {"Name": "Set from 09/14/2026 20:46:00",
+              "EquippedItems": [ <full item record>, ... ],
+              "UsedMods": [{"ModGuid":{"serializedGuid":"<uuid>"},
+                            "ModName": "Yet another seamless mod"}]}
+
+*** Sets are INDEPENDENT COPIES, not references. ***
+Verified: in A1 the set referenced 37 GUIDs and NONE matched any GUID in items[].
+Saving an outfit clones the currently equipped items.
+
+  * Editing items[] does NOT update any set, and vice versa.
+  * Update BOTH if a change should appear in an outfit preset.
+  * `UsedMods[]` is also the source of mod GUID -> mod NAME lookups.
+
+===============================================================================
+ 6. SLOTS AND "WHAT GOES IN THIS SLOT"
+===============================================================================
+
+Save-observed equipment slots (vanilla ids that ever occupy a slot):
+  EyeMakeup, HairMain, HairAdditional, HairAccessoryL, Teeth, Skin, Flesh,
+  Head, Eyes, Ears, Tail, Hologram, PersonalityModule, LegL, LegR, ArmL, ArmR,
+  StockingL, StockingR, ShoeL, ShoeR, Bra, Panties, NeckAccessory, Lips, Navel,
+  Pedicure, Manicure, Glasses, NippleRight, NippleLeft, TongueAccessory,
+  UpperBody, UpperBodyOuter, LowerBody, CalfBodyModules, BoobsBodyModules,
+  FeetBodyModules, ThighBodyModules, AssBodyModules
+
+  Within the vanilla namespace each type id uses ONE slot consistently.
+
+IN-GAME UI CATEGORY TABS (from the inventory screen; the game's own taxonomy):
+  Row 1: All | Legs | Arms | Hair | Skin | Ears | Tail | Body size |
+         Personality Module | Other | Equipped | Modded | Favourite
+  Row 2: All | Lower body | Upper body | Outer | Bra | Panties | Socks | Shoes |
+         Glasses | Neck | Make up | Piercing | Other | Equipped | Favourite
+  Row 1 groups body-part items, row 2 groups clothing items.
+
+  The **Modded** tab almost certainly filters on `_gameId._guid` being non-empty
+  (section 3) - i.e. "does this item come from a mod namespace?".
+
+  Tab names exist as UI localization keys, e.g. `Slot_Lips`,
+  `Slot_PersonalityModule`, `Slot_UpperBodyOuter`, plus `Equipment_*` keys
+  (Equipment_Arms, Equipment_BodySizeModules, Equipment_Food, Equipment_Clothes,
+  Equipment_Can, Equipment_Contract, Equipment_Fish, Equipment_All ...).
+  Found in the localization Shared Data bundle
+  (46c941530c6f45cd51b8e149487c8160.bundle).
+
+FULL PER-SLOT ITEM LIST  ->  items_by_slot.txt / items_by_slot.json
+  Built by `build_final_items.py`:
+     * 350 items from ItemEnum
+     * slot = vanilla save ground truth where a type was equipped UNANIMOUSLY,
+       otherwise inferred from the item's internal name
+     * validated: 55 of 60 unanimous pairs agree (92%). The 5 disagreements are
+       all benign naming differences, and the SAVE value is used for those:
+          203  HypercamoPonytailHair  save=HairAdditional   (name says HairMain)
+         1007  HyperCamoFlesh         save=Flesh            (name says Skin)
+         1008  HyperCamoCatEars       save=Head             (name says Ears)
+        13000  CuteBow               save=HairAccessoryL   (name says Other)
+        17122  FlowerKidVHoodie      save=UpperBodyOuter   (name says Outer)
+
+  Group sizes (items that can go in each slot):
+    Outer 32, Panties 20, PersonalityModule 10, HairMain 8, StockingL 8,
+    StockingR 8, Stockings 8, Tail 8, NeckAccessory 6, ArmR 6, ArmL 5, LegL 5,
+    LegR 5, Skin 5, EyeMakeup 5, Glasses 5, HairAccessoryL 5, Bra 4, LowerBody 3,
+    Eyes 3, ShoeL 3, ShoeR 3, Shoes 3, Teeth 3, Ears 3, BikiniSet 2, Hologram 2,
+    and singletons (Head, Flesh, Lips, Manicure, Pedicure, Navel,
+    TongueAccessory, NippleLeft, NippleRight, Nipples, Thigh/Calf/Feet/Boobs/
+    AssBodyModules, UpperBodyOuter), Other 118 (food/fish/tools).
+
+  Ears group (all three): CatEars(1), HyperCamoPointyEars(1009), PointyEars(13008)
+  Head group:             HyperCamoCatEars(1008)
+  => Cat ears are a Head-group item; pointy ears are an Ears-slot item. This is
+     consistent across all 50 saves.
+
+  NOTE: several distinct types share one slot (e.g. 8 StockingL types, 20
+  Panties types, 32 Outer hoodies). These are separate ITEMS competing for the
+  same slot, not duplicates.
+
+  LAYERED SLOTS: a slot can legitimately hold MORE THAN ONE item at once.
+  `validate` reports this as a warning, not an error. Observed in saves:
+      EyeMakeup x5   (eyeshadow + eyeliner + stickers + lashes all at once)
+  Equipping into EyeMakeup therefore must NOT displace the others; `equip`
+  treats it as layered and skips the displacement step.
+
+===============================================================================
+ 7. COLOUR MECHANICS  (and why the editor shows 0..255)
+===============================================================================
+
+*** THE GAME USES TWO INCOMPATIBLE COLOUR ENCODINGS. DO NOT BLINDLY CONVERT. ***
+
+  A) ITEM colours - `itemManager.items[]._colors[]` and
+     `itemManager.sets[].EquippedItems[]._colors[]`:
+         FLOATS in 0..1
+         {"r": 0.8835151195526123, "g": 0.7664645314216614,
+          "b": 0.7090826034545898, "a": 1.0}
+
+  B) UI / SYSTEM colours - e.g. `botStatusAppManager._consoleStyle.TextColor`
+     and `...BackgroundColor`:
+         INTEGERS in 0..255
+         {"r": 0, "g": 255, "b": 0, "a": 255}
+
+  A naive "normalise every {r,g,b,a} dict to 0..1" pass DIVIDES THE UI COLOURS
+  BY 255 AND DESTROYS THEM. This was caught by the round-trip test:
+      before -> {"TextColor": {"r": 0, "g": 255, "b": 0, "a": 255}}
+      after  -> {"TextColor": {"r": 0.0, "g": 1.0, "b": 0.0, "a": 1.0}}
+  The CLI therefore only ever normalises dicts reached through a key named
+  `_colors`. See `normalize_colors()` in mdrg-cli.py.
+
+ITEM COLOUR CHANNELS map to Live2DController.ColoringGroupEnum groups (extracted
+from the assembly). Observed groups include Hair0_Top, StockingL, StockingR,
+Panties, ShoeL, ShoeR, Skin, Blush, SharpTeeth, CatEarMain, Tail, Hologram, ...
+So colour[i] addresses a specific colourable sub-group of the model, which is
+why each item exposes 1-5 colour channels.
+
+--- IS IT RGB OR RGBA? --------------------------------------------------------
+
+REAL RGBA, and alpha is meaningful. Census over all 50 saves
+(16,732 colour entries / 66,928 values):
+
+    key sets seen:  ('a','b','g','r')  x16732        <- 100%, never RGB-only
+    value types:    float x66928                     <- never int
+    values > 1.0:   0
+    observed range: r 0..1   g 0..1   b 0..1   a 0.5..1
+    alpha != 1.0:   238 entries
+
+Alpha is a two-state transparency flag in practice:
+    a = 1.0   x16,494   (opaque)
+    a = 0.5   x238      (transparent - the "Transparent bikini" items)
+So the editor MUST offer `a` (showing it as a 0..255 channel is fine: 128 ~ 0.5)
+and MUST NOT drop it.
+
+--- VALUES ARE STRICTLY FLOAT 0..1 IN THE FILE -------------------------------
+
+0 of 16,732 entries are an int or above 1.0. Writing 0..255 into `_colors`
+would be outside anything the game itself ever writes; the game reads these as
+Unity float colours and alpha 0.5 would become 127.5. So:
+
+    the FILE keeps 0..1 floats, the UI presents 0..255.
+
+The conversion is deliberately trivial:
+    display : round(v * 255)      -> shows "200/255"
+    store   : n / 255             -> 0.7843137254901961
+
+CAVEAT - the 0..255 view is LOSSY:
+    stored 0.06506794691085815 -> shows 17 -> back 0.06666666666666667
+    stored 0.5                 -> shows 128 -> back 0.5019607843137255
+    stored 0.7843137254901961  -> shows 200 -> back 0.7843137254901961 (exact)
+Confirming an UNTOUCHED channel must therefore not round-trip it. mdrg-cli
+tracks an `edit_dirty` flag and keeps the original float when the edit buffer
+was never typed into; +/-/[ ]/H edits are intentional and do convert.
+
+EDITOR RULE (implemented in mdrg-cli)
+  * DISPLAY r/g/b/a as integers 0..255  (round(v * 255)).
+  * WRITE floats 0..1, clamped, via n/255.
+  * Input > 1 is treated as 0..255 and divided by 255; input in 0..1 keeps its
+    literal meaning. Non-numeric input leaves the channel unchanged.
+  * Interactive colour mode: +/- adjust by 1, [ ] by 8, H opens a #RRGGBB hex
+    prompt, Tab flips between the 0..255 and 0..1 representations.
+  * Untouched channels are preserved bit-exact (no quantisation drift).
+  * Verified after a save: all 564 item colour blocks float 0..1, and the 8 UI
+    colour channels unchanged.
+
+TESTING
+  `test_roundtrip.py` copies a real save, applies colour edits through the CLI,
+  then asserts: the .bak is byte-identical to the pre-save file, all item
+  colours are float 0..1, edited values match exactly, ONLY the intended keys
+  changed, UI colours untouched, file reloads with the same item count.
+  Result: ALL CHECKS PASSED.
+
+===============================================================================
+ 8. TOOLING IN THIS DIRECTORY
+===============================================================================
+
+  extract_itemenum.py       reads ItemEnum from Il2CppGameAssembly.dll (dnfile)
+                            -> itemenum.txt
+  fix_enum.py               corrects the off-by-one -> itemenum_fixed.txt
+                            (RE-RUN to verify the 8 anchors after a game update)
+  build_final_items.py      builds items_by_slot.txt / items_by_slot.json
+  investigate_moditems.py   namespace census (vanilla vs mod guids)
+  build_inventory.py        per-id evidence from saves -> items_inventory.txt
+  survey_items.py           field-usage census
+  extract_items.py          UnityFS v8 reader for the localization bundle
+  build_items_canonical.py  348 localized display names + descriptions
+  check_gids.py / verify_enum.py   verification helpers
+
+  ARTIFACTS
+    items_by_slot.txt/.json   *** PRIMARY: all items grouped by slot ***
+    itemenum_fixed.txt        all 352 items (id -> internal name)
+    item_ids.txt              id -> name, consumed by mdrg-cli.py
+    items_inventory.txt/.json per-type save evidence
+    items_canonical.json      localized display names + descriptions
+    items_bundle.bin          decompressed localization bundle
+
+  SUPERSEDED / DO NOT USE
+    gameid_mappings.json, merged_mappings.json, save_mapper.py,
+    guid_mappings.json, all_guid_mappings.json, save_gameid_mappings.json
+    -> raw string-table dumps, wrong namespace, demonstrably wrong names.
+
+  TESTING
+    test_roundtrip.py         proves colour edits save correctly (see section 7).
+                              Run after any change to save_data/normalize_colors.
+    test_tui.py               drives the curses editor in a pty through 43 key
+                              steps; run after any editor change.
+
+  CLI DATA FILES (next to mdrg-cli.py)
+    item_ids.txt              id -> internal name            (required)
+    items_by_slot.json        slot -> [items]                (optional, for slotsdb)
+
+===============================================================================
+ 9. REVERSE-ENGINEERING NOTES (so this isn't redone)
+===============================================================================
+
+  * UnityFS v8: blocksInfo is 16-BYTE ALIGNED. When `flags & 0x200`, the real
+    blocksInfo starts at `(pos + 15) & ~15`. `flags & 0x3F` = compression type
+    (3 = LZ4HC). This cost the most time.
+  * Localization StringTables (Items_en etc.) live only in the Addressables
+    localization bundle (a418819a3ad0468b3d03402b45383142.bundle). Row layout:
+    [u8 row_index][6B per-string hash][u32 strlen][bytes][pad4]; row_index wraps
+    at 256 and is NOT an identity.
+  * Item DISPLAY NAMES come from the `Items_en` localization table; item
+    IDENTITY comes from ItemEnum. Both were needed.
+    NAMING DECISION: the CLI displays the ItemEnum internal names (SneakerL),
+    NOT the Items_en strings. Do not "improve" this - see section 11.
+  * The equip slot is NOT stored in items; it is a property of the item type,
+    which is why the slot comes from saves or from the type's name.
+  * Cpp2IL output (`cpp2il_out/GameAssembly.dll`) did NOT contain these strings;
+    `Il2CppAssemblies/Il2CppGameAssembly.dll` did.
+  * `monodis`/`ikdasm` crash or truncate on the IL2CPP dummy assemblies; use the
+    `dnfile` python package for metadata extraction.
+
+===============================================================================
+ 10. CLI INTEGRATION  (mdrg-cli.py)
+===============================================================================
+
+DATA
+  `item_ids.txt` is loaded once at startup. Resolution order for a record:
+      (empty guid, id)  -> vanilla name from item_ids.txt, else "id <n>"
+      (mod guid,  id)   -> "mod:<ModName> #<id>" where ModName comes from
+                           sets[].UsedMods[]; falls back to the guid prefix.
+
+RULES THE EDITOR MUST RESPECT
+  1. `_gameId._guid` must be preserved byte-for-byte. Changing an id without
+     clearing/changing the guid silently repoints to another mod's item.
+  2. `UniqueItemGuid.serializedGuid` is the primary key - do not regenerate it,
+     and keep uniqueness within items[].
+  3. Outfit sets hold INDEPENDENT COPIES (section 5). Edit both if needed.
+  4. Colour channels must remain floats in 0..1 (section 7).
+  5. `_count` on scaffold entries (4000/4001/4002/4003/5000) is not a quantity;
+     prefer not to touch it.
+  6. `_quality` 2000.0 is a sentinel ("unset"); don't render it as a stat.
+
+SAFETY
+  * Every write goes through `save_data()`.
+  * ORDER MATTERS: `save_data()` takes the `.bak` FIRST, before any mutation or
+    normalisation, so the backup is always the exact bytes that were on disk.
+  * Item colours are then normalised (only under `_colors`) and the file written.
+  * A colour can therefore never be persisted out of range or as an int.
+
+WHAT IS IMPLEMENTED IN mdrg-cli.py
+  * `item_ids.txt` (id -> name) is loaded once at startup.
+  * `cmd_items` groups by the FULL (modGuid, id) key and prints decoded names:
+        SneakerL (#1000001)       8 recs   6 qty   24 colors   ShoeL
+        [mod] Yet another seamless mod #1     1      1      1   ArmR
+    `items -e` also prints a #RRGGBB swatch per equipped item.
+  * The interactive editor shows an item header when you land on a record:
+        Item: SneakerL (#1000001)
+        Slot: ShoeL
+        Colors: #C880FF a=255
+  * Colour rows render as `200/255   0.784314` and edit either way (section 7).
+  * `set` accepts 0..255 for colour channels:
+        mdrg-cli set M20.mdrgslot itemManager.items[2]._colors[0].r 200
+        -> stores 0.7843137254901961 (float, clamped)
+
+--- COMMAND REFERENCE ---------------------------------------------------------
+
+  READ / INSPECT
+    scan <dir>                 list saves with a progression summary
+    slots <dir>                auto + manual slots, time/money/stage
+    info <file>                structure overview
+    stats <file>               key player stats
+    analyze <file>...          per-file summary
+    flags <file>               story flags
+    emails <file> [-d]         inbox
+    story <file>               seen story text ids
+    playerprefs <file>         PlayerPrefs.pp
+    dump <file> [--depth N]    raw pretty-print
+    extract <file> <field>     recursive field search
+    diff <a> <b>               compare two slots
+    gui [files...]             graphical analyzer
+
+  ITEMS
+    items <file> [-e]          inventory grouped by (modGuid, id)
+    inventory <files|dir>      rich table; filters -e -s -n -c --mod --vanilla
+    slotsdb [slot]             WHICH ITEMS CAN GO IN A SLOT (groups + ids)
+    find <text> <targets>      search item names across saves (--deep for raw)
+    color <file> <sel>         view colours as 0-255 / hex
+    color <file> <sel> --set r=255,g=0,b=128 [--all]
+    tree <file> [-o out]       dump with names + colours resolved
+    export <file> [-o out]     normalised JSON summary
+
+  EDIT
+    set <file> <path> <value>  one-shot value set (0-255 colours accepted)
+    edit <file>                interactive TUI
+    additem <file> <name|id>   append an item (-n count, -q quality, -c colours, -s slot)
+    delitem <file> <sel>       remove items (-y, --dry-run)
+    dupe <file> <sel> -n N     duplicate with fresh GUIDs
+    equip <file> <sel> -s SLOT equip (omit -s to unequip); warns on wrong slot
+    validate <file>            guids, unknown ids, colour ranges, slot clashes
+    backups <file>             list .bak files
+    backups <file> --restore   restore latest (keeps .prerestore)
+
+  Item selectors (used by color/delitem/dupe/equip):
+      @3              index into items[]
+      guid:ab12cd     UniqueItemGuid prefix
+      =SneakerL       exact internal name
+      sneaker         substring match
+      mod:seamless    items from a mod namespace
+
+--- INTERACTIVE EDITOR KEYS ---------------------------------------------------
+
+  NAVIGATION
+    ↑ ↓  W S            move
+    ←  A  ESC           up one level / clear filter
+    →  D  Enter         descend, or edit a scalar
+    g / G               first / last entry
+    Home / End          first / last
+    Ctrl+U / Ctrl+D     page up / page down
+    /                   filter the visible entries (ESC clears)
+    :                   jump to a path (e.g. itemManager.items[0]._count)
+    header shows        [selected/total] and the active filter
+
+  EDITING
+    e                   edit the selected scalar
+    Tab                 cycle value type (bool/int/float/str)
+    + -  [ ]            adjust ±1 / ±8 (colour mode)
+    H                   colour mode: enter #RRGGBB
+    n                   add a key (dict) or append a value (list)
+    r                   rename the selected key
+    x                   delete the selected key / list entry
+    c                   clone (items get a fresh UniqueItemGuid and no slot)
+    y / p               yank the value / paste into the selection
+    u / Ctrl+R          undo / redo (100 levels)
+
+  FILES
+    o  Ctrl+S           save (writes a .bak first)
+    q                   quit - asks again if there are unsaved changes
+    ?                   help overlay
+
+  SAFETY NOTE: ESC deliberately does NOT quit. Arrow keys arrive as
+  ESC + '[' + letter, so a split read would otherwise close the editor while
+  the user is only navigating. (This was a real bug, caught by test_tui.py.)
+
+  The editor also shows, when you land on an item record:
+        Item: SneakerL (#1000001)
+        Slot: ShoeL
+        Colors: #C880FF a=255
+
+--- TESTING -------------------------------------------------------------------
+
+  test_roundtrip.py   prove colour edits save correctly (10 checks)
+  test_tui.py         drive the curses UI in a pty through 43 key steps:
+                      asserts no crashes, arrow keys safe, an unsaved file is
+                      never written, and saving with no edits leaves the content
+                      byte-identical with a byte-identical .bak.
+  Both: ALL CHECKS PASSED.
+
+===============================================================================
+ 11. REMAINING WORK
+===============================================================================
+
+  1. DECIDED - DO NOT PURSUE localized display names.
+     ItemEnum internal names are preferred and are what the CLI shows
+     (SneakerL, HyperCamoCatEars, YaranaikaPanties). They are shorter, stable
+     and more precise than the Items_en marketing strings ("Left sneaker").
+     `items_canonical.json` (348 localized names+descriptions) is kept only as
+     reference material for descriptions, not for display.
+  2. Item STATS (price, quality modifiers) are code-side and not yet extracted.
+     `ItemStats` / `IGameStatModifier` types exist in the assembly.
+  3. Confirm in-game that HyperCamoCatEars really is a Head-slot item.
+
+===============================================================================
+ 12. PLATFORM SUPPORT (Linux / Windows / macOS)
+===============================================================================
+
+The CLI targets Python 3.8+ using only the standard library. It runs on all
+three desktop platforms; nothing needs to be compiled.
+
+12.1  SAVE DIRECTORY PER PLATFORM
+---------------------------------
+
+Unity picks the path from the "company name / product name" pairs. For
+MDRG those are `IncontinentCell` / `My Dystopian Robot Girlfriend`.
+
+  Windows  %USERPROFILE%\AppData\LocalLow\IncontinentCell\My Dystopian Robot Girlfriend\Saves\
+  macOS    ~/Library/Application Support/unity3d/IncontinentCell/My Dystopian Robot Girlfriend/Saves/
+  Linux    ~/.config/unity3d/IncontinentCell/My Dystopian Robot Girlfriend/Saves/
+           ~/.local/share/unity3d/IncontinentCell/My Dystopian Robot Girlfriend/Saves/
+
+You do not have to know this. With no directory argument the CLI auto-detects:
+
+    python mdrg-cli.py scan
+    python mdrg-cli.py where     <- prints platform, detected dirs, which is used
+
+Resolution order, first hit wins:
+
+  1. an explicit path on the command line
+  2. the directory of the save file you are editing  (always preferred)
+  3. MDRG_GAME_DIR / MDRG_SAVES_DIR environment variable
+  4. the first platform candidate that exists
+
+Rule 2 is why editing `...\Saves\M7.mdrgslot` always writes back next to it,
+even if you also have a Steam copy or a backed-up folder elsewhere.
+
+12.2  THE ONE WINDOWS-SPECIFIC GOTCHA: LINE ENDINGS
+---------------------------------------------------
+
+Save files use bare LF, no BOM (verified: 20941 LF, 0 CRLF, 0 bare CR).
+Python's text mode on Windows translates "\n" to "\r\n" by default, which
+would corrupt every file it rewrites. Every write path therefore passes
+`newline="\n"` and writes UTF-8 without a BOM.
+
+`test_roundtrip.py` asserts this on every run: after a save it reloads the
+raw bytes and fails if any CRLF, bare CR or BOM appeared. This is a
+deliberate regression guard for Windows.
+
+12.3  THE INTERACTIVE EDITOR (`edit`)
+-------------------------------------
+
+The TUI is built on `curses`. On Linux and macOS that ships with Python. On
+Windows it does not, so install the backport once:
+
+    pip install windows-curses
+
+If it is missing the CLI says so instead of raising ImportError, and every
+non-interactive command still works. On terminals with no Unicode support the
+editor and all reports fall back to plain ASCII (`-`, `>`, `->`, `OK`, `!`).
+
+12.4  ENVIRONMENT VARIABLES
+---------------------------
+
+  MDRG_GAME_DIR     force the game data dir (the parent of Saves/)
+  MDRG_SAVES_DIR    force the Saves dir directly
+  MDRG_ASCII=1      plain-ASCII output
+  MDRG_UNICODE=1    force Unicode glyphs on
+
+A `--ascii` flag does the same thing for a single run.
+
+12.5  RUNNING IT
+----------------
+
+  Linux / macOS   python3 mdrg-cli.py <command> [dir]
+  Windows         python  mdrg-cli.py <command> [dir]
+
+`py mdrg-cli.py ...` also works on Windows. There are no third-party runtime
+dependencies; `dnfile` and `lz4` are needed only to regenerate `item_ids.txt`
+from the shipped assembly, never to edit a save.
+
+===============================================================================

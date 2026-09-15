@@ -1,0 +1,1494 @@
+{
+ "Ears": [
+  {
+   "id": 1,
+   "name": "CatEars"
+  },
+  {
+   "id": 1009,
+   "name": "HyperCamoPointyEars"
+  },
+  {
+   "id": 13008,
+   "name": "PointyEars"
+  }
+ ],
+ "LegL": [
+  {
+   "id": 2,
+   "name": "BasicLegL"
+  },
+  {
+   "id": 103,
+   "name": "VolksAutoBasicLegL"
+  },
+  {
+   "id": 107,
+   "name": "ExperimentalLegL"
+  },
+  {
+   "id": 111,
+   "name": "HypercamoExperimentalLegL"
+  },
+  {
+   "id": 1000,
+   "name": "HyperCamoLegL"
+  }
+ ],
+ "LegR": [
+  {
+   "id": 3,
+   "name": "BasicLegR"
+  },
+  {
+   "id": 102,
+   "name": "VolksAutoBasicLegR"
+  },
+  {
+   "id": 106,
+   "name": "ExperimentalLegR"
+  },
+  {
+   "id": 110,
+   "name": "HypercamoExperimentalLegR"
+  },
+  {
+   "id": 1001,
+   "name": "HyperCamoLegR"
+  }
+ ],
+ "ArmL": [
+  {
+   "id": 4,
+   "name": "BasicArmL"
+  },
+  {
+   "id": 100,
+   "name": "VolksAutoBasicArmL"
+  },
+  {
+   "id": 104,
+   "name": "ExperimentalArmL"
+  },
+  {
+   "id": 108,
+   "name": "HypercamoExperimentalArmL"
+  },
+  {
+   "id": 1002,
+   "name": "HyperCamoArmL"
+  }
+ ],
+ "ArmR": [
+  {
+   "id": 5,
+   "name": "BasicArmR"
+  },
+  {
+   "id": 101,
+   "name": "VolksAutoBasicArmR"
+  },
+  {
+   "id": 105,
+   "name": "ExperimentalArmR"
+  },
+  {
+   "id": 109,
+   "name": "HypercamoExperimentalArmR"
+  },
+  {
+   "id": 1003,
+   "name": "HyperCamoArmR"
+  }
+ ],
+ "Tail": [
+  {
+   "id": 6,
+   "name": "CatTail"
+  },
+  {
+   "id": 7,
+   "name": "CatTailDifferentEnd"
+  },
+  {
+   "id": 8,
+   "name": "TailFluffy"
+  },
+  {
+   "id": 9,
+   "name": "StripedTailFluffy"
+  },
+  {
+   "id": 50,
+   "name": "HyperCamoCatTail"
+  },
+  {
+   "id": 51,
+   "name": "HyperCamoCatTailDifferentEnd"
+  },
+  {
+   "id": 52,
+   "name": "HyperCamoTailFluffy"
+  },
+  {
+   "id": 53,
+   "name": "HyperCamoStripedTailFluffy"
+  }
+ ],
+ "HairMain": [
+  {
+   "id": 200,
+   "name": "HypercamoClothierHair"
+  },
+  {
+   "id": 201,
+   "name": "HypercamoEyeCoveringBangHair"
+  },
+  {
+   "id": 202,
+   "name": "HypercamoHimeCutHair"
+  },
+  {
+   "id": 1005,
+   "name": "HyperCamoHair"
+  },
+  {
+   "id": 1201,
+   "name": "RainbowHair"
+  },
+  {
+   "id": 1203,
+   "name": "GalaxyHair"
+  },
+  {
+   "id": 1204,
+   "name": "FourthDimensionHair"
+  },
+  {
+   "id": 1501,
+   "name": "DefaultHair"
+  }
+ ],
+ "HairAdditional": [
+  {
+   "id": 203,
+   "name": "HypercamoPonytailHair"
+  }
+ ],
+ "Teeth": [
+  {
+   "id": 500,
+   "name": "SharpTeeth"
+  },
+  {
+   "id": 501,
+   "name": "HyperCamoSharpTeeth"
+  },
+  {
+   "id": 1505,
+   "name": "DefaultTeeth"
+  }
+ ],
+ "Other": [
+  {
+   "id": 750,
+   "name": "LibidoDestroyer"
+  },
+  {
+   "id": 751,
+   "name": "LibidoAmplifier"
+  },
+  {
+   "id": 2000,
+   "name": "CanOfBakedBeans"
+  },
+  {
+   "id": 2001,
+   "name": "PickledOnions"
+  },
+  {
+   "id": 2002,
+   "name": "Sausage"
+  },
+  {
+   "id": 2003,
+   "name": "InstantNoodles"
+  },
+  {
+   "id": 2004,
+   "name": "EnergyDrink"
+  },
+  {
+   "id": 2005,
+   "name": "ProteinBar"
+  },
+  {
+   "id": 2006,
+   "name": "Chips"
+  },
+  {
+   "id": 2007,
+   "name": "Soda"
+  },
+  {
+   "id": 2008,
+   "name": "Sweets"
+  },
+  {
+   "id": 2009,
+   "name": "TacoShell"
+  },
+  {
+   "id": 2010,
+   "name": "GmoVegetables"
+  },
+  {
+   "id": 2011,
+   "name": "Soyrent"
+  },
+  {
+   "id": 2012,
+   "name": "ChickenNuggets"
+  },
+  {
+   "id": 3000,
+   "name": "BreadFromDispenser"
+  },
+  {
+   "id": 4000,
+   "name": "SempillX"
+  },
+  {
+   "id": 4001,
+   "name": "Vinegara"
+  },
+  {
+   "id": 4002,
+   "name": "EndurancePlus"
+  },
+  {
+   "id": 4003,
+   "name": "VinegaraPremium"
+  },
+  {
+   "id": 4004,
+   "name": "DeathGrip"
+  },
+  {
+   "id": 5000,
+   "name": "Antidepressants"
+  },
+  {
+   "id": 13009,
+   "name": "SeptumPiercing"
+  },
+  {
+   "id": 13010,
+   "name": "SeptumPiercing2"
+  },
+  {
+   "id": 13014,
+   "name": "EyePatch"
+  },
+  {
+   "id": 2000000,
+   "name": "BasicFishingRod"
+  },
+  {
+   "id": 2000001,
+   "name": "ReinforcedFishingRod"
+  },
+  {
+   "id": 2000002,
+   "name": "FiberGlassFishingRod"
+  },
+  {
+   "id": 2000003,
+   "name": "CarbonFiberFishingRod"
+  },
+  {
+   "id": 2000004,
+   "name": "HyperSteelFishingRod"
+  },
+  {
+   "id": 2001000,
+   "name": "Bluegill"
+  },
+  {
+   "id": 2001001,
+   "name": "LargemouthBass"
+  },
+  {
+   "id": 2001002,
+   "name": "NorthernPike"
+  },
+  {
+   "id": 2001003,
+   "name": "YellowPerch"
+  },
+  {
+   "id": 2001004,
+   "name": "Walleye"
+  },
+  {
+   "id": 2001005,
+   "name": "RainbowTrout"
+  },
+  {
+   "id": 2001006,
+   "name": "SmallmouthBass"
+  },
+  {
+   "id": 2001007,
+   "name": "Catfish"
+  },
+  {
+   "id": 2001008,
+   "name": "BrownTrout"
+  },
+  {
+   "id": 2001009,
+   "name": "Carp"
+  },
+  {
+   "id": 2001010,
+   "name": "RedSnapper"
+  },
+  {
+   "id": 2001011,
+   "name": "Mackerel"
+  },
+  {
+   "id": 2001012,
+   "name": "Flounder"
+  },
+  {
+   "id": 2001013,
+   "name": "BlackSeaBass"
+  },
+  {
+   "id": 2001014,
+   "name": "Halibut"
+  },
+  {
+   "id": 2001015,
+   "name": "Salmon"
+  },
+  {
+   "id": 2001016,
+   "name": "GoldenSalmon"
+  },
+  {
+   "id": 2001017,
+   "name": "Tilapia"
+  },
+  {
+   "id": 2002000,
+   "name": "WormBait"
+  },
+  {
+   "id": 2002001,
+   "name": "LarvaeBait"
+  },
+  {
+   "id": 2002002,
+   "name": "MeatBait"
+  },
+  {
+   "id": 2002003,
+   "name": "FishChunksBait"
+  },
+  {
+   "id": 2002004,
+   "name": "CornBait"
+  },
+  {
+   "id": 2002005,
+   "name": "ShrimpBait"
+  },
+  {
+   "id": 2002006,
+   "name": "MusselsBait"
+  },
+  {
+   "id": 2003000,
+   "name": "OldCan"
+  },
+  {
+   "id": 2003001,
+   "name": "OldShoe"
+  },
+  {
+   "id": 2003002,
+   "name": "OldSyringe"
+  },
+  {
+   "id": 2003003,
+   "name": "OldGrenade"
+  },
+  {
+   "id": 2003004,
+   "name": "RustedBucket"
+  },
+  {
+   "id": 2003005,
+   "name": "OilDrumLid"
+  },
+  {
+   "id": 2003006,
+   "name": "BoneFragments"
+  },
+  {
+   "id": 2003007,
+   "name": "ShatteredSmartphone"
+  },
+  {
+   "id": 2003008,
+   "name": "OldDrSugarCan"
+  },
+  {
+   "id": 2003009,
+   "name": "PlasticGroceryBag"
+  },
+  {
+   "id": 2003010,
+   "name": "OldFishingNet"
+  },
+  {
+   "id": 2003011,
+   "name": "OldCarBattery"
+  },
+  {
+   "id": 2005000,
+   "name": "Rice"
+  },
+  {
+   "id": 2005001,
+   "name": "Potatoes"
+  },
+  {
+   "id": 2005002,
+   "name": "Flour"
+  },
+  {
+   "id": 2005003,
+   "name": "Tomato"
+  },
+  {
+   "id": 2005004,
+   "name": "Carrot"
+  },
+  {
+   "id": 2005005,
+   "name": "Steak"
+  },
+  {
+   "id": 2005006,
+   "name": "ChickenMeat"
+  },
+  {
+   "id": 2005007,
+   "name": "Onions"
+  },
+  {
+   "id": 2005008,
+   "name": "Eggs"
+  },
+  {
+   "id": 2005009,
+   "name": "Milk"
+  },
+  {
+   "id": 2005010,
+   "name": "Garlic"
+  },
+  {
+   "id": 2005011,
+   "name": "Ginger"
+  },
+  {
+   "id": 2005012,
+   "name": "SoySauce"
+  },
+  {
+   "id": 2005013,
+   "name": "Vinegar"
+  },
+  {
+   "id": 2005014,
+   "name": "Pasta"
+  },
+  {
+   "id": 2005015,
+   "name": "RawGroundBeef"
+  },
+  {
+   "id": 2005016,
+   "name": "Sugar"
+  },
+  {
+   "id": 2005017,
+   "name": "Butter"
+  },
+  {
+   "id": 2005018,
+   "name": "Cheese"
+  },
+  {
+   "id": 2005019,
+   "name": "Yoghurt"
+  },
+  {
+   "id": 2020000,
+   "name": "BeansOnDispenserBread"
+  },
+  {
+   "id": 2020001,
+   "name": "PickledOnionsWithSausage"
+  },
+  {
+   "id": 2020002,
+   "name": "LandlordsTaco"
+  },
+  {
+   "id": 2020003,
+   "name": "SmallSalad"
+  },
+  {
+   "id": 2020004,
+   "name": "SimpleFriedFish"
+  },
+  {
+   "id": 2020005,
+   "name": "PotatoEggSalad"
+  },
+  {
+   "id": 2020006,
+   "name": "ChickenNoodleSoup"
+  },
+  {
+   "id": 2020007,
+   "name": "AmericanChili"
+  },
+  {
+   "id": 2020008,
+   "name": "CarrotSalad"
+  },
+  {
+   "id": 2020009,
+   "name": "FriedRice"
+  },
+  {
+   "id": 2020010,
+   "name": "CookedSteak"
+  },
+  {
+   "id": 2020011,
+   "name": "Pancakes"
+  },
+  {
+   "id": 2020012,
+   "name": "FancyFriedFish"
+  },
+  {
+   "id": 2020013,
+   "name": "SpaghettiBolognese"
+  },
+  {
+   "id": 2020014,
+   "name": "Gyros"
+  },
+  {
+   "id": 2020015,
+   "name": "Omurice"
+  },
+  {
+   "id": 2020016,
+   "name": "SpaghettiCarbonara"
+  },
+  {
+   "id": 2020017,
+   "name": "BeefWelington"
+  },
+  {
+   "id": 2020018,
+   "name": "Sushi"
+  },
+  {
+   "id": 2020019,
+   "name": "SheepsCurry"
+  },
+  {
+   "id": 2020020,
+   "name": "CarrotCake"
+  },
+  {
+   "id": 2030000,
+   "name": "BasicSoap"
+  },
+  {
+   "id": 2030001,
+   "name": "ColorfulSoap"
+  },
+  {
+   "id": 3000000,
+   "name": "PumpkinMat"
+  },
+  {
+   "id": 3000001,
+   "name": "SpiderPlush"
+  },
+  {
+   "id": 3000002,
+   "name": "BatBanner"
+  },
+  {
+   "id": 3000003,
+   "name": "GhostDecoration"
+  },
+  {
+   "id": 4000000,
+   "name": "BingChillingMagazineBundle"
+  },
+  {
+   "id": 4000001,
+   "name": "LingerieCatalogue"
+  },
+  {
+   "id": 4000002,
+   "name": "LandlordsOldStove"
+  },
+  {
+   "id": 4000003,
+   "name": "FixedLandlordsOldStove"
+  }
+ ],
+ "Skin": [
+  {
+   "id": 1004,
+   "name": "HyperCamoSkin"
+  },
+  {
+   "id": 1200,
+   "name": "HightechHyperCamoSkin"
+  },
+  {
+   "id": 1202,
+   "name": "RainbowSkin"
+  },
+  {
+   "id": 1500,
+   "name": "DefaultSkin"
+  },
+  {
+   "id": 1504,
+   "name": "DefaultFlesh"
+  }
+ ],
+ "Eyes": [
+  {
+   "id": 1006,
+   "name": "HyperCamoEyes"
+  },
+  {
+   "id": 1502,
+   "name": "DefaultEyes"
+  },
+  {
+   "id": 1503,
+   "name": "DefaultHeartPupils"
+  }
+ ],
+ "Flesh": [
+  {
+   "id": 1007,
+   "name": "HyperCamoFlesh"
+  }
+ ],
+ "Head": [
+  {
+   "id": 1008,
+   "name": "HyperCamoCatEars"
+  }
+ ],
+ "Hologram": [
+  {
+   "id": 1205,
+   "name": "HologramDisable"
+  },
+  {
+   "id": 1506,
+   "name": "DefaultHologram"
+  }
+ ],
+ "PersonalityModule": [
+  {
+   "id": 1300,
+   "name": "TsunTsunPersonalityModule"
+  },
+  {
+   "id": 1301,
+   "name": "CatgirlPersonalityModule"
+  },
+  {
+   "id": 1302,
+   "name": "DriverPersonalityModule"
+  },
+  {
+   "id": 1303,
+   "name": "RobotPersonalityModule"
+  },
+  {
+   "id": 1304,
+   "name": "YanderePersonalityModule"
+  },
+  {
+   "id": 1305,
+   "name": "SlutPersonalityModule"
+  },
+  {
+   "id": 1306,
+   "name": "FemcelPersonalityModule"
+  },
+  {
+   "id": 1307,
+   "name": "HimederePersonalityModule"
+  },
+  {
+   "id": 1308,
+   "name": "SillyCatPersonalityModule"
+  },
+  {
+   "id": 1309,
+   "name": "AraAraPersonalityModule"
+  }
+ ],
+ "ThighBodyModules": [
+  {
+   "id": 1400,
+   "name": "ThighSizeModule"
+  }
+ ],
+ "CalfBodyModules": [
+  {
+   "id": 1401,
+   "name": "CalfSizeModule"
+  }
+ ],
+ "FeetBodyModules": [
+  {
+   "id": 1402,
+   "name": "FeetSizeModule"
+  }
+ ],
+ "BoobsBodyModules": [
+  {
+   "id": 1403,
+   "name": "BoobSizeModule"
+  }
+ ],
+ "AssBodyModules": [
+  {
+   "id": 1404,
+   "name": "AssSizeModule"
+  }
+ ],
+ "UpperBody": [
+  {
+   "id": 10000,
+   "name": "PlainShirt"
+  },
+  {
+   "id": 10100,
+   "name": "FishShirt"
+  },
+  {
+   "id": 10101,
+   "name": "WithStupidShirt"
+  },
+  {
+   "id": 10102,
+   "name": "TempleShirt"
+  },
+  {
+   "id": 10103,
+   "name": "GamerShirt"
+  },
+  {
+   "id": 10104,
+   "name": "BotShirt"
+  },
+  {
+   "id": 10105,
+   "name": "DogeCoinShirt"
+  },
+  {
+   "id": 10106,
+   "name": "SheepShirt"
+  },
+  {
+   "id": 10107,
+   "name": "SylphyChibiShirt"
+  },
+  {
+   "id": 10108,
+   "name": "LuxeMerchShirt"
+  },
+  {
+   "id": 10109,
+   "name": "StilouMerchShirt"
+  },
+  {
+   "id": 10110,
+   "name": "VolksAutoMerchShirt"
+  },
+  {
+   "id": 10111,
+   "name": "MonizmedMerchShirt"
+  },
+  {
+   "id": 10112,
+   "name": "DiabeteMerchShirt"
+  },
+  {
+   "id": 10113,
+   "name": "CazinoMerchShirt"
+  },
+  {
+   "id": 10114,
+   "name": "DiabeteColaPowShirt"
+  },
+  {
+   "id": 10115,
+   "name": "DiabeteDrSugarShirt"
+  },
+  {
+   "id": 10116,
+   "name": "DiabeteSweetPotatoShirt"
+  },
+  {
+   "id": 10117,
+   "name": "HotPinkShirt"
+  },
+  {
+   "id": 10118,
+   "name": "InHeatShirt"
+  },
+  {
+   "id": 10119,
+   "name": "DestinationDeliriumShirt"
+  },
+  {
+   "id": 10120,
+   "name": "SilumanShirt"
+  },
+  {
+   "id": 10121,
+   "name": "SilumanAliceShirt"
+  },
+  {
+   "id": 10122,
+   "name": "FungusShirt"
+  },
+  {
+   "id": 10123,
+   "name": "YaranaikaShirt"
+  },
+  {
+   "id": 10124,
+   "name": "BakaShirt"
+  },
+  {
+   "id": 10125,
+   "name": "CIAShirt"
+  },
+  {
+   "id": 10126,
+   "name": "PolandBallShirt"
+  },
+  {
+   "id": 10127,
+   "name": "WyldspaceShirt"
+  },
+  {
+   "id": 10128,
+   "name": "PriestbotShirt"
+  },
+  {
+   "id": 10129,
+   "name": "MirthalShirt"
+  },
+  {
+   "id": 10130,
+   "name": "AGUIShirt"
+  },
+  {
+   "id": 10131,
+   "name": "BedabotsShirt"
+  },
+  {
+   "id": 10132,
+   "name": "ProjektMelodyShirt"
+  },
+  {
+   "id": 10133,
+   "name": "XoulionShirt"
+  },
+  {
+   "id": 10134,
+   "name": "UfoShirt"
+  },
+  {
+   "id": 18000,
+   "name": "VintageDress"
+  },
+  {
+   "id": 18001,
+   "name": "SlipDress"
+  }
+ ],
+ "Panties": [
+  {
+   "id": 11000,
+   "name": "PlainPanties"
+  },
+  {
+   "id": 11001,
+   "name": "LingeriePanties"
+  },
+  {
+   "id": 11002,
+   "name": "StripedPanties"
+  },
+  {
+   "id": 11003,
+   "name": "BikiniPanties"
+  },
+  {
+   "id": 11004,
+   "name": "TransparentBikiniPanties"
+  },
+  {
+   "id": 11100,
+   "name": "FishPanties"
+  },
+  {
+   "id": 11101,
+   "name": "LuxeRosePanties"
+  },
+  {
+   "id": 11102,
+   "name": "BananaPanties"
+  },
+  {
+   "id": 11103,
+   "name": "USBPanties"
+  },
+  {
+   "id": 11104,
+   "name": "YaranaikaPanties"
+  },
+  {
+   "id": 11105,
+   "name": "WyldspacePanties"
+  },
+  {
+   "id": 11106,
+   "name": "HikkeiruPanties"
+  },
+  {
+   "id": 11107,
+   "name": "RadioactivePanties"
+  },
+  {
+   "id": 11200,
+   "name": "StrawberryStripedPanties"
+  },
+  {
+   "id": 11201,
+   "name": "PeachStripedPanties"
+  },
+  {
+   "id": 11202,
+   "name": "AvocadoPanties"
+  },
+  {
+   "id": 11203,
+   "name": "CherryStripedPanties"
+  },
+  {
+   "id": 11204,
+   "name": "SpecialHaremClassPanties"
+  },
+  {
+   "id": 11205,
+   "name": "XoulionPanties"
+  },
+  {
+   "id": 11300,
+   "name": "LuxeLingeriePanties"
+  }
+ ],
+ "BikiniSet": [
+  {
+   "id": 11150,
+   "name": "BikiniSet"
+  },
+  {
+   "id": 11151,
+   "name": "TransparentBikiniSet"
+  }
+ ],
+ "StockingL": [
+  {
+   "id": 12000,
+   "name": "StockingL"
+  },
+  {
+   "id": 12002,
+   "name": "LingerieStockingL"
+  },
+  {
+   "id": 12004,
+   "name": "LongSockL"
+  },
+  {
+   "id": 12006,
+   "name": "StripedSockL"
+  },
+  {
+   "id": 12008,
+   "name": "StirrupStockingL"
+  },
+  {
+   "id": 12010,
+   "name": "ShortSockL"
+  },
+  {
+   "id": 12012,
+   "name": "TwoStripedStockingL"
+  },
+  {
+   "id": 12014,
+   "name": "KneeHighSockL"
+  }
+ ],
+ "StockingR": [
+  {
+   "id": 12001,
+   "name": "StockingR"
+  },
+  {
+   "id": 12003,
+   "name": "LingerieStockingR"
+  },
+  {
+   "id": 12005,
+   "name": "LongSockR"
+  },
+  {
+   "id": 12007,
+   "name": "StripedSockR"
+  },
+  {
+   "id": 12009,
+   "name": "StirrupStockingR"
+  },
+  {
+   "id": 12011,
+   "name": "ShortSockR"
+  },
+  {
+   "id": 12013,
+   "name": "TwoStripedStockingR"
+  },
+  {
+   "id": 12015,
+   "name": "KneeHighSockR"
+  }
+ ],
+ "Stockings": [
+  {
+   "id": 12500,
+   "name": "StockingPair"
+  },
+  {
+   "id": 12501,
+   "name": "LingerieStockingPair"
+  },
+  {
+   "id": 12502,
+   "name": "LongSockPair"
+  },
+  {
+   "id": 12503,
+   "name": "StripedSockPair"
+  },
+  {
+   "id": 12504,
+   "name": "StirrupStockingPair"
+  },
+  {
+   "id": 12505,
+   "name": "ShortSockPair"
+  },
+  {
+   "id": 12506,
+   "name": "TwoStripedStockingPair"
+  },
+  {
+   "id": 12507,
+   "name": "KneeHighSockPair"
+  }
+ ],
+ "HairAccessoryL": [
+  {
+   "id": 13000,
+   "name": "CuteBow"
+  },
+  {
+   "id": 13006,
+   "name": "TinyWizardHat"
+  },
+  {
+   "id": 13007,
+   "name": "PumpkinHairpin"
+  },
+  {
+   "id": 13015,
+   "name": "HairClip"
+  },
+  {
+   "id": 13027,
+   "name": "Headband"
+  }
+ ],
+ "NeckAccessory": [
+  {
+   "id": 13001,
+   "name": "HeartChoker"
+  },
+  {
+   "id": 13005,
+   "name": "BellChoker"
+  },
+  {
+   "id": 13020,
+   "name": "BuckleCollar"
+  },
+  {
+   "id": 13024,
+   "name": "SimpleChoker"
+  },
+  {
+   "id": 13025,
+   "name": "ColoredBuckleCollar"
+  },
+  {
+   "id": 13026,
+   "name": "SpikedCollar"
+  }
+ ],
+ "Glasses": [
+  {
+   "id": 13002,
+   "name": "HeartGlasses"
+  },
+  {
+   "id": 13012,
+   "name": "OvalGlasses"
+  },
+  {
+   "id": 13013,
+   "name": "ColoredOvalGlasses"
+  },
+  {
+   "id": 13017,
+   "name": "ColoredHeartGlasses"
+  },
+  {
+   "id": 1000000,
+   "name": "PixelGlasses"
+  }
+ ],
+ "EyeMakeup": [
+  {
+   "id": 13003,
+   "name": "EyeShadow"
+  },
+  {
+   "id": 13004,
+   "name": "GothEyeMakeup"
+  },
+  {
+   "id": 13021,
+   "name": "Eyeliner"
+  },
+  {
+   "id": 13022,
+   "name": "HeartEyeSticker"
+  },
+  {
+   "id": 13023,
+   "name": "NaturalEyelashes"
+  }
+ ],
+ "Lips": [
+  {
+   "id": 13011,
+   "name": "Lipstick"
+  }
+ ],
+ "TongueAccessory": [
+  {
+   "id": 13016,
+   "name": "TonguePiercing"
+  }
+ ],
+ "Manicure": [
+  {
+   "id": 13018,
+   "name": "Manicure"
+  }
+ ],
+ "Pedicure": [
+  {
+   "id": 13019,
+   "name": "Pedicure"
+  }
+ ],
+ "Navel": [
+  {
+   "id": 13028,
+   "name": "NavelPiercing"
+  }
+ ],
+ "NippleLeft": [
+  {
+   "id": 13029,
+   "name": "NipplePiercingL"
+  }
+ ],
+ "NippleRight": [
+  {
+   "id": 13030,
+   "name": "NipplePiercingR"
+  }
+ ],
+ "Nipples": [
+  {
+   "id": 13031,
+   "name": "NipplePiercingPair"
+  }
+ ],
+ "Bra": [
+  {
+   "id": 14000,
+   "name": "PlainBra"
+  },
+  {
+   "id": 14001,
+   "name": "LingerieBra"
+  },
+  {
+   "id": 14002,
+   "name": "BikiniBra"
+  },
+  {
+   "id": 14003,
+   "name": "TransparentBikiniBra"
+  }
+ ],
+ "LowerBody": [
+  {
+   "id": 15000,
+   "name": "PleatedSkirt"
+  },
+  {
+   "id": 15001,
+   "name": "BaggyPants"
+  },
+  {
+   "id": 15002,
+   "name": "MiniSkirt"
+  }
+ ],
+ "ShoeL": [
+  {
+   "id": 16000,
+   "name": "PlainSneakerL"
+  },
+  {
+   "id": 16003,
+   "name": "ClassyShoeL"
+  },
+  {
+   "id": 1000001,
+   "name": "SneakerL"
+  }
+ ],
+ "ShoeR": [
+  {
+   "id": 16001,
+   "name": "PlainSneakerR"
+  },
+  {
+   "id": 16004,
+   "name": "ClassyShoeR"
+  },
+  {
+   "id": 1000002,
+   "name": "SneakerR"
+  }
+ ],
+ "Shoes": [
+  {
+   "id": 16002,
+   "name": "PlainSneakerPair"
+  },
+  {
+   "id": 16005,
+   "name": "ClassyShoePair"
+  },
+  {
+   "id": 1000003,
+   "name": "SneakerPair"
+  }
+ ],
+ "Outer": [
+  {
+   "id": 17000,
+   "name": "BaggyHoodie"
+  },
+  {
+   "id": 17100,
+   "name": "DogeCoinHoodie"
+  },
+  {
+   "id": 17101,
+   "name": "WeebHoodie"
+  },
+  {
+   "id": 17102,
+   "name": "BloodyMoonHoodie"
+  },
+  {
+   "id": 17103,
+   "name": "CosplayHouseHoodie"
+  },
+  {
+   "id": 17104,
+   "name": "LuxeMerchHoodie"
+  },
+  {
+   "id": 17105,
+   "name": "StilouMerchHoodie"
+  },
+  {
+   "id": 17106,
+   "name": "VolksAutoMerchHoodie"
+  },
+  {
+   "id": 17107,
+   "name": "MonizmedMerchHoodie"
+  },
+  {
+   "id": 17108,
+   "name": "DiabeteMerchHoodie"
+  },
+  {
+   "id": 17109,
+   "name": "CazinoMerchHoodie"
+  },
+  {
+   "id": 17110,
+   "name": "DiabeteColaPowHoodie"
+  },
+  {
+   "id": 17111,
+   "name": "DiabeteDrSugarHoodie"
+  },
+  {
+   "id": 17112,
+   "name": "DiabeteSweetPotatoHoodie"
+  },
+  {
+   "id": 17113,
+   "name": "MilfHunterHoodie"
+  },
+  {
+   "id": 17114,
+   "name": "PolandBallHoodie"
+  },
+  {
+   "id": 17115,
+   "name": "AGUIHoodie"
+  },
+  {
+   "id": 17116,
+   "name": "SpecialHaremClassHoodie"
+  },
+  {
+   "id": 17117,
+   "name": "BedabotsHoodie"
+  },
+  {
+   "id": 17118,
+   "name": "ProjektMelodyHoodie"
+  },
+  {
+   "id": 17119,
+   "name": "WorldTamerHoodie"
+  },
+  {
+   "id": 17120,
+   "name": "XoulionHoodie"
+  },
+  {
+   "id": 17121,
+   "name": "CelestynHoodie"
+  },
+  {
+   "id": 17123,
+   "name": "NutekuHoodie"
+  },
+  {
+   "id": 17124,
+   "name": "SkullHoodie"
+  },
+  {
+   "id": 17125,
+   "name": "ToniSHoodie"
+  },
+  {
+   "id": 17126,
+   "name": "MadHoodie"
+  },
+  {
+   "id": 17127,
+   "name": "SJ68Hoodie"
+  },
+  {
+   "id": 17128,
+   "name": "LightSonicHoodie"
+  },
+  {
+   "id": 17129,
+   "name": "RottingSteelHoodie"
+  },
+  {
+   "id": 17130,
+   "name": "NitroriHoodie"
+  },
+  {
+   "id": 17131,
+   "name": "ShadyCornerHoodie"
+  }
+ ],
+ "UpperBodyOuter": [
+  {
+   "id": 17122,
+   "name": "FlowerKidVHoodie"
+  }
+ ]
+}
