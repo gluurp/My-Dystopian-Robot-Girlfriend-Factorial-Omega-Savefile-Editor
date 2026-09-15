@@ -54,12 +54,35 @@ def reconfigure_stdout():
 reconfigure_stdout()
 
 
+def _windows_console_utf8():
+    """True when the Windows console is genuinely on the UTF-8 code page.
+
+    sys.stdout.encoding cannot answer this. reconfigure_stdout() has already
+    forced it to "utf-8", so asking the stream whether it can render the
+    glyphs always returns yes - even on a CP437 console, where the bytes
+    would show up as mojibake and the ASCII fallback would never trigger.
+
+    Ask the console itself instead.
+    """
+    if not IS_WINDOWS:
+        return True
+    try:
+        import ctypes
+        return ctypes.windll.kernel32.GetConsoleOutputCP() == 65001
+    except (AttributeError, OSError):
+        # No console attached (redirected to a file, or an IDE output pane).
+        # Prefer plain ASCII over risking mangled output.
+        return False
+
+
 def _console_is_unicode():
     """True when stdout can encode the box-drawing glyphs we like to use"""
     if os.environ.get("MDRG_ASCII"):
         return False
     if os.environ.get("MDRG_UNICODE"):
         return True
+    if not _windows_console_utf8():
+        return False
     enc = (getattr(sys.stdout, "encoding", None) or "").lower()
     if not enc:
         return False
