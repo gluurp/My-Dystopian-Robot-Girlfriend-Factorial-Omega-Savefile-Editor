@@ -1,6 +1,6 @@
 # MDRG Save File Editor
 
-A cross-platform command-line save editor for My Dystopian Robot Girlfriend (ΩFactorial Omega)
+A cross-platform command-line save editor for My Dystopian Robot Girlfriend (!Ω Factorial Omega)
 
 
 Standard library only — no dependencies for editing. Works on Linux, Windows
@@ -47,14 +47,12 @@ Run `python3 mdrg-cli.py --help` for the full list.
 ## Requirements
 
 - Python 3.8+
-- `pip install windows-curses` — **Windows only**, for the `edit` TUI.
+- `pip install windows-curses` — **Windows only**, for the edit TUI.
   Everything else works without it.
 
 ## Safety
 
-Every write takes a `.bak` backup **before** modifying anything. Save files use
-bare LF line endings with no BOM, and the tool preserves that exactly — a
-round-trip with no edits is byte-identical.
+Every write takes a `.bak` backup **before** modifying anything. Just in case my script mangles anything or if a user mangles anything
 
 `tests/test_roundtrip.py` enforces this on every run.
 
@@ -66,8 +64,6 @@ item_ids.txt           gameID -> ItemEnum name   (required at runtime)
 items_by_slot.json     slot -> allowed items     (optional, powers slotsdb)
 mdrg.cmd               Windows launcher
 docs/                  reverse-engineering notes on the save format
-tools/                 how item_ids.txt is regenerated (not needed to edit)
-tests/                 round-trip and TUI test suites
 ```
 
 ## Tests
