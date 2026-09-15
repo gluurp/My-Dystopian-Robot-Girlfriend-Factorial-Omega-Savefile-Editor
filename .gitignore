@@ -1,20 +1,16 @@
 __pycache__/
 *.py[cod]
 
-# Editor backups of saves, if anyone points the tool at this folder
 *.bak
 *.mdrgslot
 
-# OS noise
 .DS_Store
 Thumbs.db
 desktop.ini
 
-# Scratch
 *.orig
 *.rej
 *~
 
 # Regeneration toolchain - local only, not published
 tools/
-tests/
