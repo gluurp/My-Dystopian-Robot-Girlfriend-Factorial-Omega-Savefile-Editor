@@ -1,7 +1,7 @@
 # MDRG Save File Editor
 
-A cross-platform command-line save editor for **My Dystopian Robot Girlfriend**
-(Factorial Omega, v0.97.x).
+A cross-platform command-line save editor for My Dystopian Robot Girlfriend (Factorial Omega)
+
 
 Standard library only — no dependencies for editing. Works on Linux, Windows
 and macOS.
@@ -9,10 +9,10 @@ and macOS.
 ## Quick start
 
 ```bash
-python3 mdrg-cli.py where          # show platform + detected save dirs
-python3 mdrg-cli.py slots          # list every save slot with progression
-python3 mdrg-cli.py inventory      # rich inventory view of a save
-python3 mdrg-cli.py edit M7.mdrgslot   # interactive TUI editor
+python3 mdrg-cli.py where               # show platform + detected save dirs
+python3 mdrg-cli.py slots               # list every save slot with progression
+python3 mdrg-cli.py inventory           # rich inventory view of a save
+python3 mdrg-cli.py edit M7.mdrgslot    # interactive TUI editor
 ```
 
 On Windows use `mdrg.cmd scan` instead, or `py mdrg-cli.py scan`.
@@ -66,6 +66,7 @@ item_ids.txt           gameID -> ItemEnum name   (required at runtime)
 items_by_slot.json     slot -> allowed items     (optional, powers slotsdb)
 mdrg.cmd               Windows launcher
 docs/                  reverse-engineering notes on the save format
+tools/                 how item_ids.txt is regenerated (not needed to edit)
 tests/                 round-trip and TUI test suites
 ```
 
