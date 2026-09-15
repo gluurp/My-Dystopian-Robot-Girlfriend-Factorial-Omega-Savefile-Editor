@@ -1,3 +1,15 @@
+---
+
+ignore this entire file this was my local model trying to parse the files for me bc im NOT doing allllllatttt by hand. 
+well i also had deepseek take a crack at it and it actually solved it. anyways yeah ignore this
+
+i didnt want to add this to the gitignore just in case someone wants to clone the repo and work on it themselves. 
+then theyd have something to base their stuff off of rather than trying to do it all from scratch again
+
+---
+
+
+
 ===============================================================================
  MDRG SAVE / ITEM FORMAT — WORKING NOTES AND EDITOR GUIDE
 ===============================================================================

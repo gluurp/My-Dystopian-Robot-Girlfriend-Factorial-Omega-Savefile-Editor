@@ -9,16 +9,16 @@ and macOS. (I ACTUALLY HAVENT TESTED IT ON WINDOWS OR MACOS... I was too lazy to
 ## Quick start
 
 ```bash
-python3 mdrg-savefile-editor.py where            # platform + detected save dirs
-python3 mdrg-savefile-editor.py slots            # all save slots + progression
-python3 mdrg-savefile-editor.py inventory        # rich inventory view of a save
-python3 mdrg-savefile-editor.py edit             # pick a save from a list
-python3 mdrg-savefile-editor.py edit M7.mdrgslot # ...or name one directly
+python3 mdrg-savefile-editor.py where                           # platform + detected save dirs
+python3 mdrg-savefile-editor.py slots                           # all save slots + progression
+python3 mdrg-savefile-editor.py inventory                       # rich inventory view of a save
+python3 mdrg-savefile-editor.py edit                            # pick a save from a list
+python3 mdrg-savefile-editor.py edit full/path/to/slot.mdrgslot # ...or name one directly
 ```
 
 On Windows use `mdrg-savefile-editor.cmd scan` instead, or `py mdrg-savefile-editor.py scan`.
 
-No save directory argument is needed — the tool auto-detects it per platform
+No save directory argument is needed, the tool automatically detects it per platform
 and, when you name a specific file, always operates on **that file's own
 folder**.
 
@@ -43,8 +43,7 @@ folder**.
 ### Editing
 
 `edit` is the interactive curses TUI editor. You can navigate, edit scalars,
-add/delete items, rename, clone, and undo/redo.
-
+add/delete items, rename, clone, and undo/redo.  
 Give it no file argument and it lists the saves it can find: `.mdrgslot`
 and `.mdrg` files plus their `.bak` backups, so you can pick one:
 
@@ -56,7 +55,7 @@ It starts with your **main save folder**. The last row scans every other save
 folder it knows about, which is handy if you have a second install or a
 backup copy somewhere else.
 
-| Key | |
+| Key | Does |
 |---|---|
 | `↑` `↓` / `j` `k` / `w` `s` | move |
 | `Enter` | open the highlighted file |
@@ -67,14 +66,15 @@ backup copy somewhere else.
 Each row shows the file's size and last-modified date so you can spot the save
 you actually want. Backups are dimmed.
 
-**Moving between saves.** The list and the editor are two levels of one
+**Moving between saves**   
+The list and the editor are two levels of one
 navigation model. Backing out of a file's root (`a` or `←`) returns you to the
-list, so you can hop between saves without quitting and re-running the tool.
+list, so you can hop between saves without quitting and re-running the tool.  
 Back goes up exactly one level at a time, just like it does between sections
 inside a file.
 
 `ESC` deliberately does *not* go up a level. Arrow keys arrive as
-`ESC` + `[` + letter, so a split read can deliver a bare `ESC` — if that
+`ESC` + `[` + letter, so a split read can deliver a bare `ESC`. If that
 navigated, a stray arrow press would bounce you out of the file mid-edit.
 
 **Backups.** Pressing `Enter` on a `.bak` asks what you want to do with it:
@@ -85,12 +85,16 @@ navigated, a stray arrow press would bounce you out of the file mid-edit.
 | **restore** | put it back as the live save and delete the `.bak` |
 | **cancel** | back to the list |
 
-A restore is not a one-way door: your current file is copied to
-`.prerestore` first, so the state you had before is still on disk.
+A restore will create another backup `.prerestore` so the edited file still exists.
 
 If no save directory exists at all, it prints the paths it checked instead of
 failing silently, so you can see where it looked and point it somewhere with
 `MDRG_SAVES_DIR`.
+
+So say you edit `M1.mdrgslot` and brick it.\
+You'll have `M1.mdrgslot` (modified) and `M1.mdrgslot.bak`.\
+Then you restore `M1.mdrgslot.bak`. You'll have `M1.mdrgslot` (original) and `M1.mdrgslot.prerestore`.\
+-- I also havent really tested this lmk if its broken pls (~_~;).
 
 ### Data manipulation
 
@@ -120,10 +124,10 @@ python3 mdrg-savefile-editor.py backups M20.mdrgslot --restore
 ```
 
 Save files use bare LF line endings and no BOM, and the tool preserves that
-exactly — a save with no edits comes back byte-identical. `tests/test_roundtrip.py`
+exactly, so a save with no edits comes back byte-identical. `tests/test_roundtrip.py`
 asserts this on every run.
 
-Your save isn't written to until you save it. It's copied to a temp dir
+Your save isn't written to until you save it, it's copied to a temp dir
 
 ## Environment variables
 
