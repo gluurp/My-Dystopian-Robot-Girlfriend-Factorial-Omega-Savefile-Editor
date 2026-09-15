@@ -852,7 +852,7 @@ def cmd_gui(args):
     """Open a small Tk GUI backed by the same parser as the CLI."""
     try:
         import tkinter as tk
-        from tkinter import filedialog, messagebox
+        from tkinter import filedialog
     except ImportError as exc:
         print(f"Error: Tk is unavailable: {exc}", file=sys.stderr)
         sys.exit(1)
@@ -1345,12 +1345,11 @@ _COLOR_KEYS = ("r", "g", "b", "a")
 
 
 def load_item_names():
-    """Load id -> name from item_ids.txt beside this script (or the worktree)."""
+    """Load id -> name from item_ids.txt beside this script."""
     if ITEM_NAMES:
         return ITEM_NAMES
     here = Path(__file__).resolve().parent
-    for cand in (here / "item_ids.txt",
-                 here / ".kilo/worktrees/wool-accordion/item_ids.txt"):
+    for cand in (here / "item_ids.txt",):
         try:
             with open(cand, "r", encoding="utf-8") as f:
                 for line in f:
@@ -1423,8 +1422,7 @@ def load_slot_db():
     if SLOT_DB:
         return SLOT_DB
     here = Path(__file__).resolve().parent
-    for cand in (here / "items_by_slot.json",
-                 here / ".kilo/worktrees/wool-accordion/items_by_slot.json"):
+    for cand in (here / "items_by_slot.json",):
         try:
             raw = json.loads(cand.read_text(encoding="utf-8"))
         except (FileNotFoundError, json.JSONDecodeError):
