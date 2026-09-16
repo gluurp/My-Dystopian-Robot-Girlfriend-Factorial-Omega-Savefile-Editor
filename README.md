@@ -142,6 +142,6 @@ Your save isn't written to until you save it, it's copied to a temp dir
 
 | OS | Path |
 |---|---|
-| Windows | `%USERPROFILE%\AppData\LocalLow\IncontinentCell\My Dystopian Robot Girlfriend\Saves\` |
+| Windows | `%AppData%\LocalLow\IncontinentCell\My Dystopian Robot Girlfriend\Saves\` |
 | macOS | `~/Library/Application Support/unity3d/IncontinentCell/My Dystopian Robot Girlfriend/Saves/` |
 | Linux | `~/.config/unity3d/IncontinentCell/My Dystopian Robot Girlfriend/Saves/` |
