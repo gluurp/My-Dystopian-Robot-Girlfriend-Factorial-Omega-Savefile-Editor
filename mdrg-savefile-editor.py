@@ -1694,12 +1694,18 @@ def cmd_set(args):
 
 
 def item_context_lines(node, mods=None):
-    """Header lines describing an item record (label, slot, colour swatches)"""
+    """Header lines describing an item record (label, count, slot, swatches)"""
     if not isinstance(node, dict) or "_gameId" not in node:
         return []
     gj = node.get("_gameId") or {}
     guid = ((gj.get("_guid") or {}).get("serializedGuid") or "").strip()
-    out = [f" Item: {gameid_label(guid, gj.get('_id'), mods)}"]
+    label = gameid_label(guid, gj.get("_id"), mods)
+    n = node.get("_count")
+    # Same count the list row shows. Leaving it out here would mean the stack
+    # size vanished the moment you opened the item to look at it.
+    if n is not None:
+        label += f"  x{n}"
+    out = [f" Item: {label}"]
     slot = (node.get("_equipedSlot") or "").strip()
     out.append(f" Slot: {slot}" if slot else " Slot: (not equipped)")
     cols = [c for c in (node.get("_colors") or []) if is_color_dict(c)]
@@ -1722,19 +1728,46 @@ def item_label_of(v, mods=None):
     return gameid_label(guid, gj.get("_id"), mods)
 
 
+def item_preview(v, mods=None):
+    """Compact one-line preview of an item record, or "" if `v` is not one
+
+    The same facts cmd_inventory prints as columns - name, count, quality, slot
+    and colour swatches - squeezed into one line. Ordered most- to
+    least-important, because the row is truncated at the terminal edge: on a
+    narrow screen the swatches run off before the name does.
+    """
+    label = item_label_of(v, mods)
+    if not label:
+        return ""
+    bits = [label]
+    n = v.get("_count")
+    if n is not None:
+        bits.append(f"x{n}")
+    q = v.get("_quality")
+    if isinstance(q, (int, float)) and not isinstance(q, bool):
+        bits.append(f"q={float(q):.3f}")
+    slot = (v.get("_equipedSlot") or "").strip()
+    if slot:
+        bits.append(f"slot={slot}")
+    cols = [c for c in (v.get("_colors") or []) if is_color_dict(c)]
+    if cols:
+        bits.append(" ".join(color_hex(c) for c in cols[:5]))
+    return "  ".join(bits)
+
+
 def editor_child_value(v, mods=None):
     """Value string for a child row
 
-    Colour dicts show a hex swatch. Item records show their item name, which
-    beats the "{dict 17}" placeholder - the type column already carries the
-    dict/N size, so the placeholder was redundant. Putting the name in this
-    column also makes `/Manicure` filter the item list by name.
+    Colour dicts show a hex swatch. Item records show an item_preview, which
+    beats the "{dict 17}" placeholder - the type column right next to it already
+    carries the dict/N size, so the placeholder was pure redundancy. Having the
+    name in this column also makes `/Manicure` filter the item list by name.
     """
     if is_color_dict(v):
         return f"{color_hex(v)}  {len(v)} ch"
-    label = item_label_of(v, mods)
-    if label:
-        return label
+    preview = item_preview(v, mods)
+    if preview:
+        return preview
     return format_value(v)
 
 
