@@ -152,3 +152,8 @@ Your save isn't written to until you save it, it's copied to a temp dir
 | Windows | `%AppData%\LocalLow\IncontinentCell\My Dystopian Robot Girlfriend\Saves\` |
 | macOS | `~/Library/Application Support/unity3d/IncontinentCell/My Dystopian Robot Girlfriend/Saves/` |
 | Linux | `~/.config/unity3d/IncontinentCell/My Dystopian Robot Girlfriend/Saves/` |
+
+# Extra notes to be aware of
+
+Item count starts at 0, so if you have a single slip dress thats unique in color, itll have count 0  
+Items with unique stats (colors/wear/damage/etc) are counted separately
