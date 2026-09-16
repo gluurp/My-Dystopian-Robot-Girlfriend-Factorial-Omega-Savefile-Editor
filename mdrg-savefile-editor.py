@@ -1674,20 +1674,18 @@ def cmd_set(args):
 
 
 def item_context_lines(node, mods=None):
-    """Header lines describing an item record (label, count, slot, swatches)"""
+    """Header lines describing an item record (label, count, swatches)"""
     if not isinstance(node, dict) or "_gameId" not in node:
         return []
     gj = node.get("_gameId") or {}
     guid = ((gj.get("_guid") or {}).get("serializedGuid") or "").strip()
     label = gameid_label(guid, gj.get("_id"), mods)
     n = owned_count(node)
-    # Same count the list row shows. Leaving it out here would mean the stack
-    # size vanished the moment you opened the item to look at it.
+    # The same count the list row shows. Leaving it out here would mean the
+    # stack size vanished the moment you opened the item to look at it.
     if n is not None:
         label += f"  x{n}"
     out = [f" Item: {label}"]
-    slot = (node.get("_equipedSlot") or "").strip()
-    out.append(f" Slot: {slot}" if slot else " Slot: (not equipped)")
     cols = [c for c in (node.get("_colors") or []) if is_color_dict(c)]
     if cols:
         out.append(" Colors: " + "  ".join(
@@ -1795,7 +1793,6 @@ DETAIL_MODES = ("count", "quality", "color")
 
 
 LABEL_W = 36
-DETAIL_W = 7        # exactly q=1.000 and #FFF0EC; x999999 still fits
 
 
 def item_detail(v, mode):
@@ -1820,22 +1817,18 @@ def item_detail(v, mode):
 def item_preview(v, mods=None, detail="count"):
     """Compact one-line preview of an item record, or "" if `v` is not one
 
-    Name, then whichever value the detail cycler is set to - count, quality or
-    colour - then the slot if the item is equipped.
+    Name, then the value the detail cycler is set to - count, quality or colour
 
-    The value sits in a fixed column right after the name, so it can be scanned
-    down the list. The slot trails it, because an optional field in the middle
-    would push the value out of line on every unequipped row; it still gets a
-    guaranteed separating space, so a full-width value cannot run into it
+    The equip slot is deliberately absent. Which slot an item belongs in is
+    already implied by the item, so a slot column said nothing a reader did not
+    already know - and a slot name that disagreed with its item read as a bug
+    rather than as data. The item header still reports it, which is where
+    "is this actually equipped" belongs
     """
     label = item_label_of(v, mods)
     if not label:
         return ""
-    out = f"{label:<{LABEL_W}}{item_detail(v, detail):<{DETAIL_W}}"
-    slot = (v.get("_equipedSlot") or "").strip()
-    if slot:
-        out += f" slot={slot}"
-    return out
+    return f"{label:<{LABEL_W}}{item_detail(v, detail)}"
 
 
 def editor_child_value(v, mods=None, detail="count"):
@@ -1891,7 +1884,7 @@ def _save_dir_candidates():
 
 
 def _candidate_dirs():
-    """Save directories that actually exist, best first, de-duplicated"""
+    """Save directories that actually exist, best first, de-duped"""
     seen, out = set(), []
     for d in _save_dir_candidates():
         try:
@@ -2022,6 +2015,16 @@ def _enable_mouse():
         curses.mousemask(mask)
     except Exception:
         return False
+    try:
+        # Without this, ncurses holds a button press for the click-resolution
+        # interval before reporting it, because it is working out whether the
+        # press is part of a click. That interval defaults to 200ms and was
+        # measured at 166ms per click - a visible lag on every click. The wheel
+        # is unaffected, since a wheel notch is not clickable. We only ever read
+        # the _PRESSED bits, so turn the resolution off entirely.
+        curses.mouseinterval(0)
+    except Exception:
+        pass
     return True
 
 

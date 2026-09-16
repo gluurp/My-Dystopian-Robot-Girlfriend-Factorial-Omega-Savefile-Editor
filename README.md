@@ -83,7 +83,10 @@ The buttons match the keys: **left click is forward** (like `d`) and **right
 click is back** (like `a`). A click acts on the current selection, not on the row
 you pointed at.
 
-The one cost: with mouse reporting on, the terminal hands clicks and drags to
+Clicks land immediately. Terminals normally hold onto a click for like 200ms which is for double clicks but is also stupid and dumb. That wait is switched off, so a press is acted on as soon
+as it arrives. The trade-off is that a double-click is just two clicks.
+
+The one cost is  with mouse reporting on, the terminal hands clicks and drags to
 the tool instead of selecting text itself, so drag-to-select needs **Shift**
 held. Most terminals still honour that.
 
@@ -111,35 +114,40 @@ or the other, not both at once.
 
 ### Item rows
 
-Item rows show the name, then one value column, then the slot if it's equipped:
+A row reads left to right: the grab marker, the position in the save's list,
+the record type and how many keys it holds, then the item itself.
 
 ```text
-BasicLegR (#3)                      x2
-BikiniBra (#14002)                  x1      slot=Bra
-TransparentBikiniPanties (#11004)   x1      slot=Panties
+ ► [27]                              dict/17  StockingR (#12001)                  x2
 ```
 
-`v` cycles that value column between **count**, **quality** and **colour**, so
-one field does the work of three:
+The item is its name and internal id, followed by one value column. `v` cycles
+that column between **count**, **quality** and **colour**, so one field does the
+work of three — the same row in each mode:
 
 ```text
-BasicLegR (#3)                      x2            ← count (default)
-BasicLegR (#3)                      q=0.699       ← quality
-BasicLegR (#3)                      #FFF0EC       ← colour
+ ► [27]                              dict/17  StockingR (#12001)                  x2
+ ► [27]                              dict/17  StockingR (#12001)                  q=0.699
+ ► [27]                              dict/17  StockingR (#12001)                  #FFF0EC
 ```
 
 Three fields side by side would never fit — a count, a quality and five swatches
 need about 90 columns between them — so they take turns instead. That also means
 the value can sit in a **fixed column** and be scanned straight down the list,
-which ragged spacing never allowed. The name and the value are padded to fixed
-widths for exactly that reason; the slot trails behind, since an optional field
-in the middle would knock the value out of line on every unequipped row.
+which ragged spacing never allowed, so the name is padded to a fixed width.
+
+**No slot column.** Which slot an item belongs in is already implied by the
+item, so it told you nothing you didn't know — and a slot name that disagreed
+with its item read as a bug rather than as data. It's gone from the rows *and*
+from the item header. Equipping is still there and still editable — it's the
+`_equipedSlot` key inside the item. The header keeps the colours and their
+alpha, which genuinely are per-item.
 
 `x1` means one — the save stores a 0 for that, the row does the plus one for
-you. Colour mode shows the first three swatches; open the item to see them all,
-with their alpha. Quality mode shows a flat `q=1.000` on clothes and modules,
-which is truthful rather than hidden — you asked for quality, so it shows the
-quality. Reach for `%q` when you want to *find* something by it.
+you. Counts run past two digits, and `x999999` still fits. Quality mode shows a
+flat `q=1.000` on clothes and modules, which is truthful rather than hidden —
+you asked for quality, so it shows the quality. Reach for `%q` when you want to
+*find* something by it.
 
 ### Moving between saves
 
@@ -156,11 +164,16 @@ navigated, a stray arrow press would bounce you out of the file mid-edit.
 The row in hand is marked so you can see what you're carrying:
 
 ```text
- ✥ [7]   StockingR (#12001)  slot=StockingR  #832746  x2
+ ✥ [0]                               dict/17  BasicLegR (#3)                      x2
+```
+The status line names what you're carrying and whether it has moved yet:
+
+```text
+ Type: list (164 items)    detail: count    grabbed BasicLegR (#3)   (unmoved)  w/s carry it, m drop
 ```
 
 Nothing is written until you drop it. The entry stays exactly where it was in
-the file the whole time — the row is only *drawn* in its new place — so
+the file the whole time. The row is only *drawn* in its new place, so
 cancelling costs nothing at all. **Every key except up/down cancels** the grab,
 navigation keys included, so you can't leave a half-moved entry behind by
 wandering off. The cancelling key is swallowed: one stray press cancels and
