@@ -83,20 +83,21 @@ The buttons match the keys: **left click is forward** (like `d`) and **right
 click is back** (like `a`). A click acts on the current selection, not on the row
 you pointed at.
 
-Clicks land immediately. Terminals normally hold onto a click for like 200ms which is for double clicks but is also stupid and dumb. That wait is switched off, so a press is acted on as soon
-as it arrives. The trade-off is that a double-click is just two clicks.
+Clicks land immediately. Terminals normally hold onto a click for like 200ms which is for double clicks but is also stupid and dumb. 
+That wait is off, so a press is acted on as soon as it arrives. 
+The trade-off is that a double click is just two clicks (Not important for this btw so dwbi).
 
-The one cost is  with mouse reporting on, the terminal hands clicks and drags to
+The one cost is that with mouse reporting on, the terminal hands clicks and drags to
 the tool instead of selecting text itself, so drag-to-select needs **Shift**
-held. Most terminals still honour that.
+held. Most terminals still honor that hopefully... I mean mine do （＾ω＾）
 
 ### Filtering
 
-`/` filters whatever section you're looking at. Plain text matches a row's name or its value, and whatever you type sticks to that section. Come back to it from above or below and the filter is still there.
-`ESC` clears it. (ESC is slightly different than a or arrow left in that manner)
+`/` filters whatever section you're looking at. Plain text matches a row's name or its value, and whatever you type sticks to that section. 
+Come back to it from above or below and the filter is still there.
+`ESC` clears it. (ESC is different than a or arrow left in that manner)
 
-For items you can compare numbers as well, which plain text can't reach since
-they aren't columns:
+For items you can compare numbers as well, which plain text can't reach since they aren't columns:
 
 | Filter | Matches |
 |---|---|
@@ -131,27 +132,13 @@ work of three — the same row in each mode:
  ► [27]                              dict/17  StockingR (#12001)                  #FFF0EC
 ```
 
-Three fields side by side would never fit — a count, a quality and five swatches
-need about 90 columns between them — so they take turns instead. That also means
-the value can sit in a **fixed column** and be scanned straight down the list,
-which ragged spacing never allowed, so the name is padded to a fixed width.
-
-**No slot column.** Which slot an item belongs in is already implied by the
-item, so it told you nothing you didn't know — and a slot name that disagreed
-with its item read as a bug rather than as data. It's gone from the rows *and*
-from the item header. Equipping is still there and still editable — it's the
-`_equipedSlot` key inside the item. The header keeps the colours and their
-alpha, which genuinely are per-item.
-
-`x1` means one — the save stores a 0 for that, the row does the plus one for
-you. Counts run past two digits, and `x999999` still fits. Quality mode shows a
-flat `q=1.000` on clothes and modules, which is truthful rather than hidden —
-you asked for quality, so it shows the quality. Reach for `%q` when you want to
-*find* something by it.
+3 fields are just too huge for the thing. So instead you gotta cycle it. 
+Basically just the same idea, its not rocket science folks.
 
 ### Moving between saves
 
-The list and the editor are two levels of one navigation model. Backing out of a file's root (`a` or `←`) returns you to the list, so you can hop between saves without quitting and re-running the tool.
+The list and the editor are two levels of one navigation model. Backing out of a file's root (`a` or `←`) returns you to the list, 
+so you can hop between saves without quitting and re-running the tool.
 Back goes up exactly one level at a time, just like it does between sections inside a file.
 
 `ESC` deliberately does *not* go up a level. Arrow keys arrive as
@@ -178,10 +165,7 @@ cancelling costs nothing at all. **Every key except up/down cancels** the grab,
 navigation keys included, so you can't leave a half-moved entry behind by
 wandering off. The cancelling key is swallowed: one stray press cancels and
 does nothing else, rather than cancelling *and* deleting something.
-
-Reordering needs a list — `itemManager.items`, `sets` — not a dict, and it
-wants the filter cleared first, since a filtered view doesn't line up with the
-file's own indices.
+I know one of you burgers (or myself lmfao) would mangle our files by grabbing something and accidentally moving. yw guys and goys!
 
 ### Backups
 
@@ -203,7 +187,7 @@ So say you edit `M1.mdrgslot` and brick it.
 You'll have `M1.mdrgslot` (modified) and `M1.mdrgslot.bak`.
 Then you restore `M1.mdrgslot.bak`.
 You'll have `M1.mdrgslot` (original) and `M1.mdrgslot.prerestore`.
--- I also havent really tested this lmk if its broken pls (~_~;).
+-- I also havent really tested this lmk if its broken pls (~_~;). yw for this QoL stuff too
 
 ### Data manipulation
 
