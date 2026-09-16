@@ -244,6 +244,3 @@ Your save isn't written to until you save it, it's copied to a temp dir
 - SOME Item count starts at 0, so if you have a single chicken nugget, itll still have count 0 despite you literally owning it
 - For the above, do let me know if anyone can discern a pattern. I'm not doing allll that. Got it? ヾ(❀╹◡╹)ﾉﾞ
 - Items with unique stats (colors/wear/damage/etc) are counted separately
-- Counts are shown EXACTLY as stored, with nothing added on. Some records store 0 for an item you definitely own, others store 1 for a single item, and nothing in the record says which. No single adjustment can be right for both, so you get what the save says
-- In the save I tested: 137 records store 1, 21 store 0, and 6 store 2 or more (all consumables - PickledOnions 185, Antidepressants 136, VinegaraPremium 43, Vinegara 29, SempillX 28, EndurancePlus 28). Reading raw is right 137 times out of 164; adding one was right 21 times. Raw it is
-- The 21 zeroes are all clothes and cosmetics, and 38 gameIds show up more than once - often as a 0 record sat right next to a 1 record for the SAME item (BikiniBra, BikiniPanties, VintageDress, SlipDress, HeartGlasses). So a record looks like one colour variant, and the 0 is probably a variant that never got its count bumped. Closest thing to your pattern I can offer
