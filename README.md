@@ -6,6 +6,8 @@ It has a CLI and a full-screen curses TUI.
 Standard library only, so no dependencies for editing. Works on Linux, Windows
 and macOS. (I ACTUALLY HAVENT TESTED IT ON WINDOWS OR MACOS... I was too lazy to spin up a VM so SOMEONE LMK IF ITS BROKEN I'll fix it super fast dw)
 
+**Be sure to keep the script in the same dir as the .json and .txt**
+
 ## Quick start
 
 ```bash
