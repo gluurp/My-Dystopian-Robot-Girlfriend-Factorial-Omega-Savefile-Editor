@@ -1186,7 +1186,7 @@ def cmd_slots(args):
 
 
 def cmd_dump(args):
-    """Pretty-print a file (with depth control)."""
+    """Pretty-print a file (with depth control)"""
     path = Path(args.file)
     data = load_data(path)
     ft = file_type(path.name)
@@ -1843,13 +1843,17 @@ def _kaomoji(text):
 
 
 def _confirm_bak(stdscr, bak):
-    """Modal for a .bak file. Returns 'edit', 'restore' or None"""
+    """Modal for a .bak file. Returns 'edit', 'restore' or None
+
+    cancel is listed first so it is the default selection: Enter on an
+    untouched menu backs out rather than opening or overwriting anything.
+    """
     import curses
 
     opts = [
+        ("cancel",  "back to the list"),
         ("edit",    "open this backup in the editor"),
         ("restore", "put it back as the live save, then delete the .bak"),
-        ("cancel",  "back to the list"),
     ]
     sel = 0
     while True:
@@ -1874,14 +1878,15 @@ def _confirm_bak(stdscr, bak):
                 pass
         try:
             stdscr.addstr(min(h - 1, top + box_h), 0,
-                          " ↑↓:choose  Enter:confirm  ESC:cancel "[: w - 1],
+                          " ↑↓:choose  Enter:confirm  a / ← / ESC:back "[: w - 1],
                           curses.color_pair(7))
         except curses.error:
             pass
         stdscr.refresh()
 
         k = stdscr.getch()
-        if k in (27, ord("q")):
+        # same back keys as everywhere else: a, left arrow, ESC
+        if k in (27, ord("q"), ord("a"), curses.KEY_LEFT):
             return None
         elif k in (curses.KEY_UP, ord("k")):
             sel = (sel - 1) % len(opts)
