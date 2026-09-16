@@ -28,6 +28,7 @@ import argparse
 import base64
 import json
 import os
+import re
 import sys
 import uuid
 import zlib
@@ -1741,32 +1742,100 @@ def owned_count(v):
     return None
 
 
+# Numeric row filters: "%q<1", "%c>=2". %quality / %count also accepted.
+#
+# Plain filter text matches against what a row DISPLAYS, so it can only reach a
+# value that has a column. Two numbers on an item have none: quality, which is
+# dropped from the row, and how many you own, which is computed from the 0-based
+# _count rather than stored. '%' is the way into those.
+_FILTER_OPS = {
+    "<=": lambda a, b: a <= b,
+    ">=": lambda a, b: a >= b,
+    "!=": lambda a, b: a != b,
+    "==": lambda a, b: a == b,
+    "=": lambda a, b: a == b,
+    "<": lambda a, b: a < b,
+    ">": lambda a, b: a > b,
+}
+
+_FILTER_FIELDS = {
+    "q": "quality", "quality": "quality",
+    "c": "owned", "count": "owned", "n": "owned", "x": "owned",
+}
+
+ITEM_FILTER_RE = re.compile(
+    r"^%\s*([a-z]+)\s*(<=|>=|!=|==|=|<|>)\s*(-?\d+(?:\.\d+)?)$"
+)
+
+
+def item_filter_field(v, field):
+    """The number a '%' filter compares against, or None when there is none
+
+    `owned` is the count the row shows, not the 0-based value in the save, so a
+    filter always agrees with what you can see. A non-item, or an item missing
+    the field, has no number and therefore matches no comparison.
+    """
+    if not isinstance(v, dict) or "_gameId" not in v:
+        return None
+    if field == "owned":
+        return owned_count(v)
+    q = v.get("_quality")
+    if isinstance(q, (int, float)) and not isinstance(q, bool):
+        return float(q)
+    return None
+
+
+def parse_item_filter(text):
+    """Turn "%q<1" into a predicate. Returns (predicate, error).
+
+    The predicate is None when `text` is not a '%' filter at all, which is the
+    signal to fall back to plain substring matching. `error` is "" unless the
+    text looks like a filter but cannot be read, so a typo gets reported rather
+    than silently matching nothing.
+    """
+    text = (text or "").strip()
+    if not text.startswith("%"):
+        return None, ""
+    m = ITEM_FILTER_RE.match(text.lower())
+    if not m:
+        return None, "expected something like %q<1 or %c>=2"
+    field = _FILTER_FIELDS.get(m.group(1))
+    if field is None:
+        return None, f"unknown field {m.group(1)!r} - use q or c"
+    op = _FILTER_OPS[m.group(2)]
+    want = float(m.group(3))
+
+    def pred(v):
+        got = item_filter_field(v, field)
+        return got is not None and op(got, want)
+
+    return pred, ""
+
+
 def item_preview(v, mods=None):
     """Compact one-line preview of an item record, or "" if `v` is not one
 
-    The same facts cmd_inventory prints as columns - name, how many you own,
-    quality, slot and colour swatches - squeezed into one line. Ordered most-
-    to least-important, because the row is truncated at the terminal edge: on a
-    narrow screen the swatches run off before the name does.
+    Name, then the slot if it is equipped, then the colour swatches, then how
+    many you own - identity, appearance, quantity. The row is cut at the
+    terminal edge, so that order doubles as the priority order.
+
+    Quality is deliberately absent. It sits at a fixed 1.0 on clothes, modules
+    and friends, so a column of identical numbers earned its space nowhere.
+    Use a %q filter when you actually need it.
     """
     label = item_label_of(v, mods)
     if not label:
         return ""
     bits = [label]
-    n = owned_count(v)
-    if n is not None:
-        bits.append(f"x{n}")
-    q = v.get("_quality")
-    # Clothes, modules and friends carry a fixed 1.0, so printing q=1.000 on
-    # every one of them is pure noise. Only a quality doing real work shows.
-    if isinstance(q, (int, float)) and not isinstance(q, bool) and float(q) != 1.0:
-        bits.append(f"q={float(q):.3f}")
     slot = (v.get("_equipedSlot") or "").strip()
     if slot:
         bits.append(f"slot={slot}")
     cols = [c for c in (v.get("_colors") or []) if is_color_dict(c)]
     if cols:
         bits.append(" ".join(color_hex(c) for c in cols[:5]))
+    n = owned_count(v)
+    if n is not None:
+        bits.append(f"x{n}")
     return "  ".join(bits)
 
 
@@ -2407,9 +2476,22 @@ def _interactive_edit(stdscr, data, path, save_root=None):
             stdscr.getch()
             continue
 
+        # A '%' filter compares numbers, which a row's own text cannot answer -
+        # quality is not displayed at all, and the owned count is computed. So
+        # it runs here, while the underlying record is still in scope.
+        pred = parse_item_filter(filter_text)[0]
+
+        def keep(v):
+            return pred(v) if pred else True
+
+        # Unfiltered row count, for the "shown/total" part of the header.
+        total_children = len(current)
+
         children = []
         if isinstance(current, dict):
             for k, v in current.items():
+                if not keep(v):
+                    continue
                 if isinstance(v, (dict, list)):
                     type_str = f"dict/{len(v)}" if isinstance(v, dict) else f"list/{len(v)}"
                     children.append((k, BULLET, type_str,
@@ -2421,6 +2503,8 @@ def _interactive_edit(stdscr, data, path, save_root=None):
                     ))
         elif isinstance(current, list):
             for i, v in enumerate(current):
+                if not keep(v):
+                    continue
                 if isinstance(v, (dict, list)):
                     type_str = f"dict/{len(v)}" if isinstance(v, dict) else f"list/{len(v)}"
                     children.append((
@@ -2430,14 +2514,17 @@ def _interactive_edit(stdscr, data, path, save_root=None):
                 else:
                     children.append((f"[{i}]", " ", "scalar", format_value(v), "scalar"))
 
-        total_children = len(children)
-        if filter_text:
+        # A predicate already excluded what it wanted to; matching its own text
+        # against the rows as well would reject everything.
+        if filter_text and pred is None:
             ft = filter_text.lower()
             children = [c for c in children
                         if ft in str(c[0]).lower() or ft in str(c[3]).lower()]
-            if selected >= len(children):
-                selected = max(0, len(children) - 1)
-                scroll = 0
+
+        # Either kind of filter can leave the selection past the end.
+        if filter_text and selected >= len(children):
+            selected = max(0, len(children) - 1)
+            scroll = 0
 
         if filter_text:
             pos = f" [{selected + 1}/{len(children)}/{total_children}]" if children else f" [0/{total_children}]"
@@ -2466,6 +2553,8 @@ def _interactive_edit(stdscr, data, path, save_root=None):
                     ("Ctrl+U / Ctrl+D", "page up / page down"),
                     ("Home / End", "first / last"),
                     ("/", "filter entries (ESC clears)"),
+                    ("", "/text matches a name or value; %q<1 compares quality"),
+                    ("", "and %c>=2 how many you own (%quality/%count work too)"),
                     ("", "each level keeps its own filter, so it comes back"),
                     ("", "whenever you return - from either direction"),
                     (":", "jump to a path, e.g. itemManager.items[0]._count"),
@@ -2719,7 +2808,14 @@ def _interactive_edit(stdscr, data, path, save_root=None):
                     filter_text = filter_buffer
                     remember_filter(current_path_str, filter_text)
                     selected = scroll = 0
-                    status_msg = f"filter: {filter_text or '(none)'}"
+                    if not filter_text:
+                        status_msg = "filter: (none)"
+                    elif filter_text.startswith("%"):
+                        err = parse_item_filter(filter_text)[1]
+                        status_msg = (f"bad filter: {err}" if err
+                                      else f"filter: {filter_text}")
+                    else:
+                        status_msg = f"filter: {filter_text}"
                 elif jump_prompt:
                     target = jump_buffer.strip()
                     parts = parse_path(target)

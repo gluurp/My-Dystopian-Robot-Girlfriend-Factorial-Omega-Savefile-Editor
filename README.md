@@ -72,6 +72,43 @@ backup copy somewhere else.
 Each row shows the file's size and last-modified date so you can spot the save
 you actually want. Backups are dimmed.
 
+**Filtering.** `/` filters whatever section you're looking at. Plain text
+matches a row's name or its value, and whatever you type sticks to that
+section — come back to it from above or below and the filter is still there.
+`ESC` clears it.
+
+For items you can compare numbers as well, which plain text can't reach since
+they aren't columns:
+
+| Filter | Matches |
+|---|---|
+| `%q<1` | quality below 1 |
+| `%q>=1.2` | quality at least 1.2 |
+| `%c>2` | more than 2 owned |
+| `%c=1` | exactly 1 owned |
+
+`%q` is quality, `%c` is how many you own — the same number the row shows, so a
+filter never disagrees with what you can see. `%quality` and `%count` spell it
+out if you'd rather. `<` `<=` `>` `>=` `=` `==` `!=` all work.
+
+A `%` filter replaces the text match instead of combining with it, so it's one
+or the other, not both at once.
+
+**Item rows** show the name, the slot if it's equipped, the colour swatches,
+and how many you own:
+
+```text
+BikiniBra (#14002)  slot=Bra  #111B1F #4D717F  x1
+```
+
+Left to right is most important to least, because on a narrow terminal the end
+of the row gets cut off. So `x1` means one — the save stores a 0 for that, the
+row just does the plus one for you.
+
+Quality isn't in the row at all. It sits at a flat 1.0 on clothes and modules,
+so it was a column of identical numbers saying nothing. Use `%q` when you
+actually want to find something by it.
+
 **Moving between saves**   
 The list and the editor are two levels of one
 navigation model. Backing out of a file's root (`a` or `←`) returns you to the
