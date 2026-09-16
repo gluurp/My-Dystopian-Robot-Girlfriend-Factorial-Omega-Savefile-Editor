@@ -1700,7 +1700,7 @@ def item_context_lines(node, mods=None):
     gj = node.get("_gameId") or {}
     guid = ((gj.get("_guid") or {}).get("serializedGuid") or "").strip()
     label = gameid_label(guid, gj.get("_id"), mods)
-    n = node.get("_count")
+    n = owned_count(node)
     # Same count the list row shows. Leaving it out here would mean the stack
     # size vanished the moment you opened the item to look at it.
     if n is not None:
@@ -1728,23 +1728,38 @@ def item_label_of(v, mods=None):
     return gameid_label(guid, gj.get("_id"), mods)
 
 
+def owned_count(v):
+    """How many of an item you own, or None if the record does not say
+
+    `_count` is 0-BASED: it holds the number of EXTRA copies beyond this entry,
+    so an item you own once stores 0 and the owned total is one more. Printed
+    raw, every singly-owned item reads as a zero.
+    """
+    n = v.get("_count")
+    if isinstance(n, (int, float)) and not isinstance(n, bool):
+        return int(n) + 1
+    return None
+
+
 def item_preview(v, mods=None):
     """Compact one-line preview of an item record, or "" if `v` is not one
 
-    The same facts cmd_inventory prints as columns - name, count, quality, slot
-    and colour swatches - squeezed into one line. Ordered most- to
-    least-important, because the row is truncated at the terminal edge: on a
+    The same facts cmd_inventory prints as columns - name, how many you own,
+    quality, slot and colour swatches - squeezed into one line. Ordered most-
+    to least-important, because the row is truncated at the terminal edge: on a
     narrow screen the swatches run off before the name does.
     """
     label = item_label_of(v, mods)
     if not label:
         return ""
     bits = [label]
-    n = v.get("_count")
+    n = owned_count(v)
     if n is not None:
         bits.append(f"x{n}")
     q = v.get("_quality")
-    if isinstance(q, (int, float)) and not isinstance(q, bool):
+    # Clothes, modules and friends carry a fixed 1.0, so printing q=1.000 on
+    # every one of them is pure noise. Only a quality doing real work shows.
+    if isinstance(q, (int, float)) and not isinstance(q, bool) and float(q) != 1.0:
         bits.append(f"q={float(q):.3f}")
     slot = (v.get("_equipedSlot") or "").strip()
     if slot:
