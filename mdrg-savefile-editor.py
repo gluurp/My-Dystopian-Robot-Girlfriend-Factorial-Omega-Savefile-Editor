@@ -1681,8 +1681,6 @@ def item_context_lines(node, mods=None):
     guid = ((gj.get("_guid") or {}).get("serializedGuid") or "").strip()
     label = gameid_label(guid, gj.get("_id"), mods)
     n = owned_count(node)
-    # The same count the list row shows. Leaving it out here would mean the
-    # stack size vanished the moment you opened the item to look at it.
     if n is not None:
         label += f"  x{n}"
     out = [f" Item: {label}"]
@@ -1707,24 +1705,25 @@ def item_label_of(v, mods=None):
 
 
 def owned_count(v):
-    """How many of an item you own, or None if the record does not say
+    """The count a row shows: the stored `_count` verbatim, or None if absent
 
-    `_count` is 0-BASED: it holds the number of EXTRA copies beyond this entry,
-    so an item you own once stores 0 and the owned total is one more. Printed
-    raw, every singly-owned item reads as a zero.
+    This used to add one, on the theory that `_count` held EXTRA copies beyond
+    this entry, so a single item stored 0. Testing in game showed the field is
+    not consistent about that: teeth store 1 for a single item and read
+    correctly untouched, while other items store 0 for one. Nothing in the
+    record says which convention applies, so a blanket +1 fixes one group by
+    breaking the other.
+
+    Reporting the stored value never invents a number, and it matches what the
+    `analyze` and `items` commands have always printed. The caveat lives in the
+    README rather than being guessed at per item.
     """
     n = v.get("_count")
     if isinstance(n, (int, float)) and not isinstance(n, bool):
-        return int(n) + 1
+        return int(n)
     return None
 
 
-# Numeric row filters: "%q<1", "%c>=2". %quality / %count also accepted.
-#
-# Plain filter text matches against what a row DISPLAYS, so it can only reach a
-# value that has a column. Two numbers on an item have none: quality, which is
-# dropped from the row, and how many you own, which is computed from the 0-based
-# _count rather than stored. '%' is the way into those.
 _FILTER_OPS = {
     "<=": lambda a, b: a <= b,
     ">=": lambda a, b: a >= b,
@@ -1748,9 +1747,9 @@ ITEM_FILTER_RE = re.compile(
 def item_filter_field(v, field):
     """The number a '%' filter compares against, or None when there is none
 
-    `owned` is the count the row shows, not the 0-based value in the save, so a
-    filter always agrees with what you can see. A non-item, or an item missing
-    the field, has no number and therefore matches no comparison.
+    `owned` is the count the row shows - the stored `_count` verbatim, with no
+    adjustment - so a filter always agrees with what you can see. A non-item, or
+    an item missing the field, has no number and matches no comparison.
     """
     if not isinstance(v, dict) or "_gameId" not in v:
         return None

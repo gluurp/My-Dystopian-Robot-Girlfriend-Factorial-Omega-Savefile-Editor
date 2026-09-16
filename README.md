@@ -103,12 +103,12 @@ For items you can compare numbers as well, which plain text can't reach since th
 |---|---|
 | `%q<1` | quality below 1 |
 | `%q>=1.2` | quality at least 1.2 |
-| `%c>2` | more than 2 owned |
-| `%c=1` | exactly 1 owned |
+| `%c>2` | stored count above 2 |
+| `%c=1` | stored count of exactly 1 |
 
-`%q` is quality, `%c` is how many you own, the same number the row shows, so a
-filter never disagrees with what you can see. `%quality` and `%count` spell it
-out if you'd rather. `<` `<=` `>` `>=` `=` `==` `!=` all work.
+`%q` is quality and `%c` is the count - the very same number the row shows,
+verbatim, so a filter never disagrees with what you can see. `%quality` and
+`%count` spell it out if you'd rather. `<` `<=` `>` `>=` `=` `==` `!=` all work.
 
 A `%` filter replaces the text match instead of combining with it, so it's one
 or the other, not both at once.
@@ -119,7 +119,7 @@ A row reads left to right: the grab marker, the position in the save's list,
 the record type and how many keys it holds, then the item itself.
 
 ```text
- ► [27]                              dict/17  StockingR (#12001)                  x2
+ ► [0]                               dict/17  BasicLegR (#3)                      x1
 ```
 
 The item is its name and internal id, followed by one value column. `v` cycles
@@ -127,9 +127,9 @@ that column between **count**, **quality** and **colour**, so one field does the
 work of three — the same row in each mode:
 
 ```text
- ► [27]                              dict/17  StockingR (#12001)                  x2
- ► [27]                              dict/17  StockingR (#12001)                  q=0.699
- ► [27]                              dict/17  StockingR (#12001)                  #FFF0EC
+ ► [0]                               dict/17  BasicLegR (#3)                      x1
+ ► [0]                               dict/17  BasicLegR (#3)                      q=0.699
+ ► [0]                               dict/17  BasicLegR (#3)                      #FFF0EC
 ```
 
 3 fields are just too huge for the thing. So instead you gotta cycle it. 
@@ -151,7 +151,7 @@ navigated, a stray arrow press would bounce you out of the file mid-edit.
 The row in hand is marked so you can see what you're carrying:
 
 ```text
- ✥ [0]                               dict/17  BasicLegR (#3)                      x2
+ ✥ [0]                               dict/17  BasicLegR (#3)                      x1
 ```
 The status line names what you're carrying and whether it has moved yet:
 
@@ -241,5 +241,9 @@ Your save isn't written to until you save it, it's copied to a temp dir
 
 ## Extra notes to be aware of
 
-- Item count starts at 0, so if you have a single slip dress thats unique in color, itll still have count 0
+- SOME Item count starts at 0, so if you have a single chicken nugget, itll still have count 0 despite you literally owning it
+- For the above, do let me know if anyone can discern a pattern. I'm not doing allll that. Got it? ヾ(❀╹◡╹)ﾉﾞ
 - Items with unique stats (colors/wear/damage/etc) are counted separately
+- Counts are shown EXACTLY as stored, with nothing added on. Some records store 0 for an item you definitely own, others store 1 for a single item, and nothing in the record says which. No single adjustment can be right for both, so you get what the save says
+- In the save I tested: 137 records store 1, 21 store 0, and 6 store 2 or more (all consumables - PickledOnions 185, Antidepressants 136, VinegaraPremium 43, Vinegara 29, SempillX 28, EndurancePlus 28). Reading raw is right 137 times out of 164; adding one was right 21 times. Raw it is
+- The 21 zeroes are all clothes and cosmetics, and 38 gameIds show up more than once - often as a 0 record sat right next to a 1 record for the SAME item (BikiniBra, BikiniPanties, VintageDress, SlipDress, HeartGlasses). So a record looks like one colour variant, and the 0 is probably a variant that never got its count bumped. Closest thing to your pattern I can offer
