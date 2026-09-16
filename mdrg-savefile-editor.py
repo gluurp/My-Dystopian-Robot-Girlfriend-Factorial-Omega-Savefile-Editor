@@ -2539,6 +2539,88 @@ def _interactive_edit(stdscr, data, path, save_root=None):
             data.clear()
             data.update(new)
 
+    def path_keys():
+        """Keys from the root down to where we are, in the order we descended
+
+        The stack cannot be reused across a restore: it swaps every node object
+        out, so the parent/child references it holds point at orphaned copies
+        The path is remembered as plain keys and re-walked instead
+        """
+        out = []
+        for entry in stack:
+            name = entry[1]
+            if isinstance(name, str) and name.startswith("[") and name.endswith("]"):
+                try:
+                    out.append(int(name[1:-1]))
+                except ValueError:
+                    out.append(name)
+            else:
+                out.append(name)
+        return out
+
+    def goto_path(keys):
+        """Re-walk `keys` into the live data, rebuilding the stack as we go
+
+        Stops at the deepest level that still exists rather than failing: an undo
+        can delete the very entry you were standing on, and landing on its parent
+        beats being thrown back to the root.
+
+        Returns (node, breadcrumb, steps completed, stack entries). The caller
+        adopts the entries only on success, so a failed walk changes nothing
+        """
+        node, done = data, 0
+        parts = []            # (kind, key) pairs, the shape format_path wants
+        rebuilt = []
+        for k in keys:
+            if isinstance(node, list):
+                if not isinstance(k, int) or not 0 <= k < len(node):
+                    break
+                kind, name, sel = "list", f"[{k}]", k
+            elif isinstance(node, dict):
+                if k not in node:
+                    break
+                kind, name, sel = "dict", k, 0
+                for other in node:
+                    if not keep(node[other]):
+                        continue
+                    if other == k:
+                        break
+                    sel += 1
+            else:
+                break
+            child = node[k]
+            if not isinstance(child, (dict, list)):
+                break
+            rebuilt.append((node, name, child, format_path(parts), sel))
+            parts.append((kind, k))
+            node = child
+            done += 1
+        return node, format_path(parts), done, rebuilt
+
+    def time_travel(source, dest, label):
+        """Undo or redo one step, without losing your place in the tree
+
+        This used to reset current to the root, clear the stack and point the
+        breadcrumb at "root", so every undo threw you out of the directory you
+        were working in. The path is captured before the swap and re-walked
+        after it, and the stack is rebuilt, so backing out still works from
+        wherever you land
+
+        Returns the status line to show
+        """
+        nonlocal current, current_path_str, selected, scroll, filter_text, saved_flag
+        keys = path_keys()
+        dest.append(json.dumps(data, ensure_ascii=False))
+        restore(source.pop())
+        current, current_path_str, done, rebuilt = goto_path(keys)
+        stack[:] = rebuilt
+        filter_text = recall_filter(current_path_str)
+        saved_flag = True
+        if done < len(keys):
+            selected = scroll = 0
+            return f"{label}: that entry is gone"
+        return f"{label} ({len(source)} left)"
+
     while True:
         stdscr.erase()
         h, w = stdscr.getmaxyx()
@@ -2588,8 +2670,10 @@ def _interactive_edit(stdscr, data, path, save_root=None):
             children = [c for c in children
                         if ft in str(c[0]).lower() or ft in str(c[3]).lower()]
 
-        if filter_text and selected >= len(children):
+        if selected >= len(children):
             selected = max(0, len(children) - 1)
+        if scroll > selected:
+            scroll = max(0, selected)
             scroll = 0
 
         if grab_from is not None:
@@ -2648,7 +2732,8 @@ def _interactive_edit(stdscr, data, path, save_root=None):
                     ("x", "delete the selected key / list entry"),
                     ("c", "clone entry (fresh guid for items)"),
                     ("y / p", "yank value / paste into the selection"),
-                    ("u / Ctrl+R", "undo / redo"),
+                    ("u  U", "undo / redo (Ctrl+R / Ctrl+Y also work)"),
+                    ("", "either way you stay in the directory you were in"),
                 ],
             },
             {
@@ -2800,11 +2885,11 @@ def _interactive_edit(stdscr, data, path, save_root=None):
 
         footer = (
             " ↑↓←→:nav  /:filter  ::jump  e:edit  r:rename  m:grab  v:detail  "
-            "x:del  c:clone  y/p  n:add  u:undo  ?:help  o:save  q:quit "
+            "x:del  c:clone  y/p  n:add  u:undo U:redo  ?:help  o:save  q:quit "
         )
         if is_color_dict(current):
             footer = (" colour: ↑↓:channel  +/-:±1  [ ]:±8  H:hex  e/→:type 0-255  "
-                      "u:undo  ?:help  o:save  q:quit ")
+                      "u:undo U:redo  ?:help  o:save  q:quit ")
         try:
             stdscr.addstr(h - 1, 0, footer[: w - 1], curses.color_pair(7))
         except curses.error:
@@ -2898,20 +2983,13 @@ def _interactive_edit(stdscr, data, path, save_root=None):
                 elif jump_prompt:
                     target = jump_buffer.strip()
                     parts = parse_path(target)
-                    # ":root.itemManager" and ":itemManager" mean the same
-                    # thing, so accept both and key the level canonically
                     if parts and parts[0] == ("dict", "root"):
                         parts = parts[1:]
-                    node, ok = data, True
-                    try:
-                        for part in parts:
-                            node = node[part[1]]
-                    except Exception:
-                        ok = False
-                    if ok:
-                        stack.clear()
-                        current = node
-                        current_path_str = format_path(parts)
+                    keys = [part[1] for part in parts]
+                    node, crumbs, done, rebuilt = goto_path(keys)
+                    if done == len(keys):
+                        stack[:] = rebuilt
+                        current, current_path_str = node, crumbs
                         selected = scroll = 0
                         filter_text = recall_filter(current_path_str)
                         status_msg = f"jumped to {current_path_str}"
@@ -3039,28 +3117,12 @@ def _interactive_edit(stdscr, data, path, save_root=None):
             help_mode = True
         elif key == ord("u"):  # undo
             if undo_stack:
-                redo_stack.append(json.dumps(data, ensure_ascii=False))
-                restore(undo_stack.pop())
-                stack.clear()
-                current = data
-                current_path_str = "root"
-                selected = scroll = 0
-                filter_text = recall_filter("root")
-                saved_flag = True
-                status_msg = f"undo ({len(undo_stack)} left)"
+                status_msg = time_travel(undo_stack, redo_stack, "undo")
             else:
                 status_msg = "nothing to undo"
-        elif key == 18:  # Ctrl+R — redo
+        elif key in (18, 25, ord("U")):  # Ctrl+R / Ctrl+Y / U — redo
             if redo_stack:
-                undo_stack.append(json.dumps(data, ensure_ascii=False))
-                restore(redo_stack.pop())
-                stack.clear()
-                current = data
-                current_path_str = "root"
-                selected = scroll = 0
-                filter_text = recall_filter("root")
-                saved_flag = True
-                status_msg = "redo"
+                status_msg = time_travel(redo_stack, undo_stack, "redo")
             else:
                 status_msg = "nothing to redo"
         elif key == ord("y"):  # yank

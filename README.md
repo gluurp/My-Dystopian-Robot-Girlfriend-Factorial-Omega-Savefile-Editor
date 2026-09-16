@@ -75,6 +75,17 @@ backup copy somewhere else.
 Each row shows the file's size and last-modified date so you can spot the save
 you actually want. Backups are dimmed.
 
+### Undo and redo
+
+`u` undoes and `U` redoes it (`Ctrl+R` and `Ctrl+Y` work too). The status line
+says how many steps are left either way.
+
+Both keep you where you were. Undoing a change three levels deep leaves you three
+levels deep, with the back keys still stepping out one level at a time, so you
+don't have to walk back down to pick up where you left off. If the entry you were
+standing in has itself been undone away, you land on its parent rather than being
+thrown to the root.
+
 ### Mouse
 
 The wheel scrolls one row per notch.
