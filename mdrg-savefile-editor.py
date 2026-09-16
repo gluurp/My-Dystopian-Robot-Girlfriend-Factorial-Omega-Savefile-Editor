@@ -1994,6 +1994,86 @@ def _kaomoji(text):
     return text
 
 
+# Mouse support.
+#
+# Without this the terminal turns one wheel notch into a BURST of arrow keys and
+# how many is the terminal's business - VS Code sends four - so a single flick
+# of the wheel jumps four rows. Asking for mouse events instead delivers one
+# event per notch, which we can move exactly one row for.
+#
+# The buttons do the same job as the arrow keys: left click forward, right click
+# back. A click acts on the current selection rather than the row under the
+# pointer, matching the keys exactly.
+#
+# The cost: while mouse reporting is on, the terminal stops doing its own
+# drag-to-select, because those drags are now reported to us and ignored.
+# Shift+drag still selects in most terminals.
+#
+# ncurses encodes a click several ways depending on version and platform, and
+# listening for both the press and the release of one click would fire twice.
+# So each button resolves to ONE encoding - the _PRESSED form - never a union.
+_MOUSE_BUTTONS = {"left": 1, "right": 3, "up": 4, "down": 5}
+
+
+def _mouse_bits():
+    """{action: button bits} for the events we handle, or {} if unsupported."""
+    import curses
+    out = {}
+    for action, button in _MOUSE_BUTTONS.items():
+        for suffix in ("_PRESSED", "_CLICKED", "_RELEASED"):
+            bits = getattr(curses, f"BUTTON{button}{suffix}", 0)
+            if bits:
+                out[action] = bits
+                break
+    return out
+
+
+def _enable_mouse():
+    """Start reporting the buttons we care about. True when it took effect."""
+    import curses
+    bits = _mouse_bits()
+    if not bits:
+        return False
+    mask = 0
+    for b in bits.values():
+        mask |= b
+    try:
+        curses.mousemask(mask)
+    except Exception:
+        return False
+    return True
+
+
+def _mouse_event():
+    """'left' / 'right' / 'up' / 'down', or None for anything else.
+
+    Consumes one pending mouse event, so a plain click can never be mistaken
+    for a wheel notch.
+    """
+    import curses
+    try:
+        _, _, _, _, bstate = curses.getmouse()
+    except Exception:
+        return None
+    for action, bits in _mouse_bits().items():
+        if bstate & bits:
+            return action
+    return None
+
+
+def _nudge(step, selected, total):
+    """The new selection after one wheel notch, clamped to the list.
+
+    One notch is one row, the same as an arrow key. Each caller keeps its own
+    scroll rule, since the editor and the picker fix up scrolling differently.
+    """
+    if step < 0:
+        return max(0, selected - 1)
+    if step > 0:
+        return min(max(0, total - 1), selected + 1)
+    return selected
+
+
 def _confirm_bak(stdscr, bak):
     """Modal for a .bak file. Returns 'edit', 'restore' or None
 
@@ -2075,6 +2155,7 @@ def _pick_save(stdscr, state=None):
     curses.curs_set(0)
     stdscr.keypad(True)
     stdscr.nodelay(False)
+    _enable_mouse()
 
     for cp, fg, bg in [
         (1, curses.COLOR_CYAN,    curses.COLOR_BLACK),
@@ -2257,6 +2338,18 @@ def _pick_save(stdscr, state=None):
                 filter_buffer += chr(key)
             continue
 
+        # Mouse: wheel is one row per notch (shown below), the buttons are the
+        # picker's own forward and back. See _enable_mouse.
+        if key == curses.KEY_MOUSE:
+            event = _mouse_event()
+            if event in ("up", "down"):
+                selected = _nudge(-1 if event == "up" else 1, selected, total)
+            elif event == "left":
+                key = curses.KEY_RIGHT
+            # right click is deliberately unbound here: the list's back key is
+            # q/ESC, which quits the whole run rather than stepping up a level,
+            # and that is too final to fire from a stray click.
+
         if key == ord("/"):
             filter_prompt = True
             filter_buffer = filter_text
@@ -2385,6 +2478,7 @@ def _interactive_edit(stdscr, data, path, save_root=None):
     curses.curs_set(0)
     stdscr.keypad(True)
     stdscr.nodelay(False)
+    _enable_mouse()
 
     # Color pairs
     for cp, fg, bg in [
@@ -2558,6 +2652,8 @@ def _interactive_edit(stdscr, data, path, save_root=None):
                     ("", "each level keeps its own filter, so it comes back"),
                     ("", "whenever you return - from either direction"),
                     (":", "jump to a path, e.g. itemManager.items[0]._count"),
+                    ("wheel", "scroll one row per notch"),
+                    ("left / right click", "forward / back, same as D and A"),
                 ],
             },
             {
@@ -2872,6 +2968,25 @@ def _interactive_edit(stdscr, data, path, save_root=None):
                 else:
                     rename_buffer += chr(key)
             continue
+
+        # Mouse: a wheel notch is one row, and the buttons mean what the arrow
+        # keys mean - left click forward, right click back. Rewriting `key`
+        # hands the work to the normal handlers below, so the mouse and the
+        # keyboard cannot drift apart.
+        if key == curses.KEY_MOUSE:
+            event = _mouse_event()
+            if event in ("up", "down"):
+                before = selected
+                selected = _nudge(-1 if event == "up" else 1,
+                                  selected, len(children))
+                if selected < before and selected < scroll:
+                    scroll = selected
+                elif selected > before and selected >= scroll + visible:
+                    scroll = selected - visible + 1
+            elif event == "right":
+                key = curses.KEY_LEFT      # back, the same as 'a'
+            elif event == "left":
+                key = curses.KEY_RIGHT     # forward, the same as 'd'
 
         if (key == curses.KEY_UP or key in (ord("w"), ord("W"))) and selected > 0:
             selected -= 1

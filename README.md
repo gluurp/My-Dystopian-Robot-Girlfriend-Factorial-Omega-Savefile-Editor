@@ -72,10 +72,20 @@ backup copy somewhere else.
 Each row shows the file's size and last-modified date so you can spot the save
 you actually want. Backups are dimmed.
 
+**Mouse.** The wheel scrolls one row per notch
+
+The buttons match the keys: **left click is forward** (like `d`) and **right
+click is back** (like `a`). A click acts on the current selection, not on the row
+you pointed at.
+
+The one cost: with mouse reporting on, the terminal hands clicks and drags to
+the tool instead of selecting text itself, so drag-to-select needs **Shift**
+held. Most terminals still honour that.
+
 **Filtering.** `/` filters whatever section you're looking at. Plain text
 matches a row's name or its value, and whatever you type sticks to that
-section — come back to it from above or below and the filter is still there.
-`ESC` clears it.
+section. Come back to it from above or below and the filter is still there.
+`ESC` clears it. (ESC is slightly different than a or arrow)
 
 For items you can compare numbers as well, which plain text can't reach since
 they aren't columns:
@@ -192,5 +202,5 @@ Your save isn't written to until you save it, it's copied to a temp dir
 
 # Extra notes to be aware of
 
-Item count starts at 0, so if you have a single slip dress thats unique in color, itll have count 0  
+Item count starts at 0, so if you have a single slip dress thats unique in color, itll still have count 0  
 Items with unique stats (colors/wear/damage/etc) are counted separately
