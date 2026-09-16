@@ -70,8 +70,6 @@ def _windows_console_utf8():
         import ctypes
         return ctypes.windll.kernel32.GetConsoleOutputCP() == 65001
     except (AttributeError, OSError):
-        # No console attached (redirected to a file, or an IDE output pane).
-        # Prefer plain ASCII over risking mangled output.
         return False
 
 
@@ -565,9 +563,9 @@ def save_data(path, data):
     so it always contains the exact bytes that were on disk
     """
     bak = backup_file(path)
-    # 2. normalize ITEM colours only (see normalize_colors for why)
+    # 2. normalize ITEM colors only (see normalize_colors for why)
     fixes = normalize_colors(data)
-    # 3. re-serialise embedded savedata for registry / old formats
+    # 3. re-serialize embedded savedata for registry / old formats
     ft = file_type(path.name)
     if ft in ("registry", "old_save"):
         keys = ("saves", "autoSaves") if ft == "registry" else ("saves",)
@@ -1816,8 +1814,6 @@ def item_detail(v, mode):
             return f"q={float(q):.3f}"
         return ""
     cols = [c for c in (v.get("_colors") or []) if is_color_dict(c)]
-    # Capped so colour mode stays about as wide as the others. Nothing is lost:
-    # the item header still lists every swatch, with its alpha.
     return " ".join(color_hex(c) for c in cols[:3])
 
 
@@ -3365,10 +3361,6 @@ def _interactive_edit(stdscr, data, path, save_root=None):
                 if filter_text:
                     status_msg = f"/{filter_text} restored"
             else:
-                # Deliberately does NOT go up a level. Arrow keys arrive as
-                # ESC + '[' + letter, so a split read yields a bare ESC; if
-                # that navigated, a stray arrow press would bounce you out of
-                # the file. Use `a` or the left arrow to go back.
                 status_msg = "at root - 'a' or left arrow goes back, q quits"
 
 
