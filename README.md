@@ -16,11 +16,17 @@ python3 mdrg-savefile-editor.py edit                            # pick a save fr
 python3 mdrg-savefile-editor.py edit full/path/to/slot.mdrgslot # ...or name one directly
 ```
 
-On Windows use `mdrg-savefile-editor.cmd scan` instead, or `py mdrg-savefile-editor.py scan`.
+On Windows use   
+```bash
+mdrg-savefile-editor.cmd scan
+```  
+instead, or  
+```bash
+py mdrg-savefile-editor.py scan
+```
 
-No save directory argument is needed, the tool automatically detects it per platform
-and, when you name a specific file, always operates on **that file's own
-folder**.
+No save directory argument is forcibly necessary, rather the tool automatically detects it per platform.  
+But when you name a specific file, always operates on that file's own folder.
 
 ## Commands
 
@@ -81,9 +87,9 @@ navigated, a stray arrow press would bounce you out of the file mid-edit.
 
 | Choice | What happens |
 |---|---|
+| **cancel** | back to the list |
 | **edit** | open the backup in the editor like any other save |
 | **restore** | put it back as the live save and delete the `.bak` |
-| **cancel** | back to the list |
 
 A restore will create another backup `.prerestore` so the edited file still exists.
 
@@ -91,9 +97,10 @@ If no save directory exists at all, it prints the paths it checked instead of
 failing silently, so you can see where it looked and point it somewhere with
 `MDRG_SAVES_DIR`.
 
-So say you edit `M1.mdrgslot` and brick it.\
-You'll have `M1.mdrgslot` (modified) and `M1.mdrgslot.bak`.\
-Then you restore `M1.mdrgslot.bak`. You'll have `M1.mdrgslot` (original) and `M1.mdrgslot.prerestore`.\
+So say you edit `M1.mdrgslot` and brick it.  
+You'll have `M1.mdrgslot` (modified) and `M1.mdrgslot.bak`.  
+Then you restore `M1.mdrgslot.bak`.  
+You'll have `M1.mdrgslot` (original) and `M1.mdrgslot.prerestore`.  
 -- I also havent really tested this lmk if its broken pls (~_~;).
 
 ### Data manipulation
