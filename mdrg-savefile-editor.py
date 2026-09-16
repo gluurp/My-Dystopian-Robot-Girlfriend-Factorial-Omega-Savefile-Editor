@@ -1696,10 +1696,32 @@ def item_context_lines(node, mods=None):
     return out
 
 
-def editor_child_value(v):
-    """Value string for a child row (colour dicts show a hex swatch)"""
+def item_label_of(v, mods=None):
+    """Item name for a record dict, or "" if `v` is not an item record
+
+    `_gameId` is the marker (the same test item_context_lines uses), so this
+    also names the entries inside sets[].EquippedItems[].
+    """
+    if not isinstance(v, dict) or "_gameId" not in v:
+        return ""
+    gj = v.get("_gameId") or {}
+    guid = ((gj.get("_guid") or {}).get("serializedGuid") or "").strip()
+    return gameid_label(guid, gj.get("_id"), mods)
+
+
+def editor_child_value(v, mods=None):
+    """Value string for a child row
+
+    Colour dicts show a hex swatch. Item records show their item name, which
+    beats the "{dict 17}" placeholder - the type column already carries the
+    dict/N size, so the placeholder was redundant. Putting the name in this
+    column also makes `/Manicure` filter the item list by name.
+    """
     if is_color_dict(v):
         return f"{color_hex(v)}  {len(v)} ch"
+    label = item_label_of(v, mods)
+    if label:
+        return label
     return format_value(v)
 
 
@@ -2306,7 +2328,8 @@ def _interactive_edit(stdscr, data, path, save_root=None):
             for k, v in current.items():
                 if isinstance(v, (dict, list)):
                     type_str = f"dict/{len(v)}" if isinstance(v, dict) else f"list/{len(v)}"
-                    children.append((k, BULLET, type_str, editor_child_value(v), "container"))
+                    children.append((k, BULLET, type_str,
+                                     editor_child_value(v, mods), "container"))
                 else:
                     children.append((
                         k, " ", "scalar",
@@ -2318,7 +2341,7 @@ def _interactive_edit(stdscr, data, path, save_root=None):
                     type_str = f"dict/{len(v)}" if isinstance(v, dict) else f"list/{len(v)}"
                     children.append((
                         f"[{i}]", BULLET, type_str,
-                        editor_child_value(v), "container"
+                        editor_child_value(v, mods), "container"
                     ))
                 else:
                     children.append((f"[{i}]", " ", "scalar", format_value(v), "scalar"))
