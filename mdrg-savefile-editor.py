@@ -1326,6 +1326,19 @@ def parse_path(path_str):
     return parts
 
 
+def format_path(parts):
+    """Canonical breadcrumb for a parsed path, e.g. root.itemManager.items[0]
+
+    The inverse of parse_path, and the exact shape the editor builds while you
+    descend. The `:` jump uses it so a section has ONE identity however you
+    arrive at it - walking there and jumping there have to agree, or a filter
+    remembered one way would be invisible the other.
+    """
+    return "root" + "".join(
+        f".{k}" if kind == "dict" else f"[{k}]" for kind, k in parts
+    )
+
+
 def set_path(data, path_str, value):
     """Set a value at the given path"""
     parts = parse_path(path_str)
@@ -2290,6 +2303,10 @@ def _interactive_edit(stdscr, data, path, save_root=None):
     filter_text = ""
     filter_prompt = False
     filter_buffer = ""
+    # breadcrumb -> filter text, one entry per level you have filtered.
+    # Keyed by the same breadcrumb shown in the Path: line, so it lines up
+    # with what you see. Local to this function, so it dies with the file.
+    filters = {}
     help_mode = False
     jump_prompt = False
     jump_buffer = ""
@@ -2302,6 +2319,23 @@ def _interactive_edit(stdscr, data, path, save_root=None):
     status_msg = ""
     last_was_nudge = False
     quit_confirm = False
+
+    def remember_filter(path_str, text):
+        """Store a level's filter - or drop the entry when it is cleared.
+
+        An empty filter is never stored, so the dict only ever holds levels you
+        actually filtered. This is the single write point for BOTH ways a
+        filter goes away (applying an empty one, and ESC), which is what stops
+        empty entries creeping in.
+        """
+        if text:
+            filters[path_str] = text
+        else:
+            filters.pop(path_str, None)
+
+    def recall_filter(path_str):
+        """The filter a level was left with ("" when it never had one)."""
+        return filters.get(path_str, "")
 
     def snapshot():
         """Push the current state for undo."""
@@ -2384,8 +2418,8 @@ def _interactive_edit(stdscr, data, path, save_root=None):
                     ("Ctrl+U / Ctrl+D", "page up / page down"),
                     ("Home / End", "first / last"),
                     ("/", "filter entries (ESC clears)"),
-                    ("", "a filter belongs to one level: it drops when you"),
-                    ("", "descend and comes back when you return"),
+                    ("", "each level keeps its own filter, so it comes back"),
+                    ("", "whenever you return - from either direction"),
                     (":", "jump to a path, e.g. itemManager.items[0]._count"),
                 ],
             },
@@ -2635,23 +2669,29 @@ def _interactive_edit(stdscr, data, path, save_root=None):
             elif key in (10, 13):
                 if filter_prompt:
                     filter_text = filter_buffer
+                    remember_filter(current_path_str, filter_text)
                     selected = scroll = 0
                     status_msg = f"filter: {filter_text or '(none)'}"
                 elif jump_prompt:
                     target = jump_buffer.strip()
+                    parts = parse_path(target)
+                    # ":root.itemManager" and ":itemManager" mean the same
+                    # thing, so accept both and key the level canonically
+                    if parts and parts[0] == ("dict", "root"):
+                        parts = parts[1:]
                     node, ok = data, True
                     try:
-                        for part in parse_path(target):
+                        for part in parts:
                             node = node[part[1]]
                     except Exception:
                         ok = False
                     if ok:
-                        # rebuild the breadcrumb for the current path
                         stack.clear()
-                        current, current_path_str = node, target
+                        current = node
+                        current_path_str = format_path(parts)
                         selected = scroll = 0
-                        filter_text = ""
-                        status_msg = f"jumped to {target}"
+                        filter_text = recall_filter(current_path_str)
+                        status_msg = f"jumped to {current_path_str}"
                     else:
                         status_msg = f"no such path: {target}"
                 else:
@@ -2729,7 +2769,7 @@ def _interactive_edit(stdscr, data, path, save_root=None):
                 current = data
                 current_path_str = "root"
                 selected = scroll = 0
-                filter_text = ""
+                filter_text = recall_filter("root")
                 saved_flag = True
                 status_msg = f"undo ({len(undo_stack)} left)"
             else:
@@ -2742,7 +2782,7 @@ def _interactive_edit(stdscr, data, path, save_root=None):
                 current = data
                 current_path_str = "root"
                 selected = scroll = 0
-                filter_text = ""
+                filter_text = recall_filter("root")
                 saved_flag = True
                 status_msg = "redo"
             else:
@@ -2831,8 +2871,7 @@ def _interactive_edit(stdscr, data, path, save_root=None):
                     else:
                         idx = int(name[1:-1])
                         child = current[idx]
-                    stack.append((current, name, child, current_path_str,
-                                  selected, filter_text))
+                    stack.append((current, name, child, current_path_str, selected))
                     if isinstance(current, dict):
                         current_path_str = f"{current_path_str}.{name}"
                     else:
@@ -2840,13 +2879,12 @@ def _interactive_edit(stdscr, data, path, save_root=None):
                     current = child
                     selected = 0
                     scroll = 0
-                    # The filter belongs to the level it was typed at. Left
-                    # set, it would hide nearly every key of the record you
-                    # just opened. It rides along in the stack frame so
-                    # backing out brings it straight back.
+                    # Going down is the same lookup as coming back up: a level
+                    # shows whatever filter it was left with, and nothing if it
+                    # never had one. Nothing needs clearing - a miss IS empty.
+                    filter_text = recall_filter(current_path_str)
                     if filter_text:
-                        status_msg = f"/{filter_text} stays with the level above"
-                        filter_text = ""
+                        status_msg = f"/{filter_text} restored"
                 elif kind == "scalar":
                     if isinstance(current, dict):
                         edit_parent = current
@@ -2989,12 +3027,12 @@ def _interactive_edit(stdscr, data, path, save_root=None):
                 edit_parent = None
                 edit_dirty = False
             elif stack:
-                parent, key, child, path_str, sel, filt = stack.pop()
+                parent, key, child, path_str, sel = stack.pop()
                 current = parent
                 current_path_str = path_str
                 selected = sel
                 scroll = max(0, selected - 3)
-                filter_text = filt
+                filter_text = recall_filter(path_str)
                 if filter_text:
                     status_msg = f"/{filter_text} restored"
             elif saved_flag and not quit_confirm:
@@ -3025,16 +3063,17 @@ def _interactive_edit(stdscr, data, path, save_root=None):
                 edit_parent = None
                 edit_dirty = False
             elif filter_text:
+                remember_filter(current_path_str, "")
                 filter_text = ""
                 selected = scroll = 0
                 status_msg = "filter cleared"
             elif stack:
-                parent, key, child, path_str, sel, filt = stack.pop()
+                parent, key, child, path_str, sel = stack.pop()
                 current = parent
                 current_path_str = path_str
                 selected = sel
                 scroll = max(0, selected - 3)
-                filter_text = filt
+                filter_text = recall_filter(path_str)
                 if filter_text:
                     status_msg = f"/{filter_text} restored"
             else:
