@@ -1797,7 +1797,7 @@ DETAIL_MODES = ("count", "quality", "color")
 
 
 LABEL_W = 36
-DETAIL_W = 8        # q=1.000 and #FFF0EC are 7; x99 is 3
+DETAIL_W = 7        # exactly q=1.000 and #FFF0EC; x999999 still fits
 
 
 def item_detail(v, mode):
@@ -1830,7 +1830,7 @@ def item_preview(v, mods=None, detail="count"):
     The value sits in a fixed column right after the name, so it can be scanned
     down the list. The slot trails it, because an optional field in the middle
     would push the value out of line on every unequipped row; it still gets a
-    guaranteed separating space, so a full-width value cannot run into it.
+    guaranteed separating space, so a full-width value cannot run into it
     """
     label = item_label_of(v, mods)
     if not label:
