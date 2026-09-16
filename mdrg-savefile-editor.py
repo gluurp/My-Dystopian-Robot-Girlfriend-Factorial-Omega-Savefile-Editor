@@ -409,7 +409,7 @@ def candidate_game_dirs():
 
 
 def candidate_save_dirs():
-    """Saves/ directories to try, best first."""
+    """Saves/ directories to try, best first"""
     return [d / "Saves" for d in candidate_game_dirs()]
 
 
@@ -541,7 +541,7 @@ def format_analysis(path, record):
     path = Path(path)
     lines = [f"=== {path.name} ==="]
     if not record:
-        return "\n".join(lines + ["No gameplay data found."])
+        return "\n".join(lines + ["No gameplay data found"])
     lines.extend([
         f"Game version: {record.get('gameVersion', '?')}",
         f"Player / bot: {record.get('playerName', '?')} / {record.get('botName', '?')}",
@@ -615,7 +615,7 @@ def ft_to_str(v):
 
 
 def ingame_time_str(seconds):
-    """Convert in-game seconds to a rough time string."""
+    """Convert in-game seconds to a rough time string"""
     if seconds is None:
         return "?"
     s = int(seconds)
@@ -640,7 +640,7 @@ def is_bool(v):
 
 
 def num(v, default=0):
-    """Return v if not None, else default."""
+    """Return v if not None, else default"""
     return v if v is not None else default
 
 
@@ -651,7 +651,7 @@ def cmd_scan(args):
         print(f"Error: {directory} is not a directory", file=sys.stderr)
         print("       run 'mdrg-savefile-editor where' to see the directories checked,",
               file=sys.stderr)
-        print("       or set MDRG_GAME_DIR to your game data folder.", file=sys.stderr)
+        print("       or set MDRG_GAME_DIR to your game data folder", file=sys.stderr)
         sys.exit(1)
 
     files = sorted(directory.iterdir(), key=lambda p: p.name)
@@ -888,7 +888,7 @@ def cmd_analyze(args):
             data = load_data(path)
             records = analysis_records(path, data)
             if not records:
-                results.append(f"=== {path.name} ===\nNo gameplay data found.")
+                results.append(f"=== {path.name} ===\nNo gameplay data found")
             else:
                 results.extend(format_analysis(path, record) for record in records)
         except (OSError, json.JSONDecodeError, TypeError, ValueError) as exc:
@@ -1035,7 +1035,7 @@ def cmd_diff(args):
         for k, v1, v2 in changed:
             print(f"  {label_for(k):<30} {v1!r:>20} {ARROW} {v2!r}")
     if not added and not removed and not changed:
-        print("No scalar changes.")
+        print("No scalar changes")
     print()
     # flags
     f1 = {f.get("name", "?"): f for f in d1.get("flags", [])}
@@ -1107,7 +1107,7 @@ def cmd_story(args):
         print(f"  Base64 FAIL: {e}")
     print()
     print(f"  Interpretation: base64 {ARROW} raw-deflate {ARROW} custom binary serialization")
-    print("  Tracks which story text IDs have already been shown.")
+    print("  Tracks which story text IDs have already been shown")
 
 
 def cmd_slots(args):
@@ -1115,7 +1115,7 @@ def cmd_slots(args):
     directory = resolve_saves_dir(getattr(args, "directory", None))
     if not directory.is_dir():
         print(f"Error: {directory} is not a directory", file=sys.stderr)
-        print("       run 'mdrg-savefile-editor where' to see the directories checked.",
+        print("       run 'mdrg-savefile-editor where' to see the directories checked",
               file=sys.stderr)
         sys.exit(1)
 
@@ -1519,7 +1519,7 @@ def qkeyorder(rec):
 
 def new_item(gid, mod_guid="", count=1, quality=1.0, slot="", colors=1,
              favourite=False):
-    """Build a fresh item record in the game's own schema."""
+    """Build a fresh item record in the game's own schema"""
     cols = [{"r": 1.0, "g": 1.0, "b": 1.0, "a": 1.0} for _ in range(max(0, colors))]
     rec = {
         "I": [], "F": [], "S": [],
@@ -1935,7 +1935,7 @@ def _scan_dir(d):
 
 def _report_no_save_dir():
     """Explain which directories were checked, in the style of `where`"""
-    print("Error: no save directory found.", file=sys.stderr)
+    print("Error: no save directory found", file=sys.stderr)
     print("\nChecked:", file=sys.stderr)
     for c in _save_dir_candidates():
         try:
@@ -2016,7 +2016,7 @@ _MOUSE_BUTTONS = {"left": 1, "right": 3, "up": 4, "down": 5}
 
 
 def _mouse_bits():
-    """{action: button bits} for the events we handle, or {} if unsupported."""
+    """{action: button bits} for the events we handle, or {} if unsupported"""
     import curses
     out = {}
     for action, button in _MOUSE_BUTTONS.items():
@@ -2029,7 +2029,7 @@ def _mouse_bits():
 
 
 def _enable_mouse():
-    """Start reporting the buttons we care about. True when it took effect."""
+    """Start reporting the buttons we care about. True when it took effect"""
     import curses
     bits = _mouse_bits()
     if not bits:
@@ -2075,7 +2075,7 @@ def _nudge(step, selected, total):
 
 
 def _grab_status(label, grab_from, grab_pos):
-    """One-line description of a pending grab, for the status row."""
+    """One-line description of a pending grab, for the status row"""
     off = grab_pos - grab_from
     where = "unmoved" if not off else f"{off:+d} row" + ("s" if abs(off) > 1 else "")
     return (f"grabbed {label}  ({where})  "
@@ -2231,7 +2231,6 @@ def _pick_save(stdscr, state=None):
             stdscr.getch()
             continue
 
-        # --- header -------------------------------------------------
         try:
             stdscr.addstr(0, 0, " open a save ".center(w - 1),
                           curses.A_BOLD | curses.A_REVERSE)
@@ -2258,7 +2257,6 @@ def _pick_save(stdscr, state=None):
         if selected >= scroll + visible:
             scroll = selected - visible + 1
 
-        # --- rows ----------------------------------------------------
         if not rows:
             if scope_all:
                 msg = "couldn't find any save files anywhere"
@@ -2291,7 +2289,6 @@ def _pick_save(stdscr, state=None):
             except curses.error:
                 pass
 
-        # --- action row (always last) --------------------------------
         act_i = len(rows)
         if scroll <= act_i < scroll + visible:
             attr = (curses.color_pair(6) | curses.A_BOLD) if selected == act_i \
@@ -2309,7 +2306,6 @@ def _pick_save(stdscr, state=None):
             except curses.error:
                 pass
 
-        # --- prompt / footer ------------------------------------------
         if filter_prompt:
             try:
                 stdscr.addstr(h - 2, 0, f" filter: {filter_buffer}_"[: w - 1],
@@ -2419,7 +2415,7 @@ def cmd_edit(args):
     try:
         import curses
     except ImportError:
-        print("Error: the interactive editor needs the 'curses' module.", file=sys.stderr)
+        print("Error: the interactive editor needs the 'curses' module", file=sys.stderr)
         if IS_WINDOWS:
             print("  Windows:  pip install windows-curses", file=sys.stderr)
             print("  (everything except 'edit' works without it)", file=sys.stderr)
@@ -2438,7 +2434,7 @@ def cmd_edit(args):
                 _report_no_save_dir()
                 sys.exit(1)
             if not (sys.stdin.isatty() and sys.stdout.isatty()):
-                print("Error: the file picker needs an interactive terminal.",
+                print("Error: the file picker needs an interactive terminal",
                       file=sys.stderr)
                 print("       name a file instead:  edit /path/to/M7.mdrgslot",
                       file=sys.stderr)
@@ -2562,7 +2558,7 @@ def _interactive_edit(stdscr, data, path, save_root=None):
         return filters.get(path_str, "")
 
     def snapshot():
-        """Push the current state for undo."""
+        """Push the current state for undo"""
         undo_stack.append(json.dumps(data, ensure_ascii=False))
         if len(undo_stack) > 100:
             undo_stack.pop(0)
@@ -2706,7 +2702,7 @@ def _interactive_edit(stdscr, data, path, save_root=None):
                 "title": "Note",
                 "entries": [
                     ("ESC", "never quits — arrow keys send ESC and a split read;"),
-                    ("",     "otherwise the editor would close mid-navigation."),
+                    ("",     "otherwise the editor would close mid-navigation"),
                 ],
             },
         ]
@@ -3909,7 +3905,7 @@ def main():
         description="Inspect / rip apart My Dystopian Robot Girlfriend save files",
         epilog=(
             "See https://github.com/ for updates. "
-            "No external dependencies required."
+            "No external dependencies required"
         ),
     )
     parser.add_argument("--ascii", action="store_true",
