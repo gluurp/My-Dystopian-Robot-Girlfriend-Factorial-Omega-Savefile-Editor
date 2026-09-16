@@ -15,3 +15,6 @@ desktop.ini
 
 # Regeneration toolchain - local only, not published
 tools/
+
+# Test harness - local only, not published
+tests/
