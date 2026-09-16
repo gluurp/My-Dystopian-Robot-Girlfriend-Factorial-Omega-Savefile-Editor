@@ -1962,7 +1962,7 @@ def _pick_save(stdscr, state=None):
     scroll = state.get("scroll", 0)
     by_name = state.get("by_name", False)
     scope_all = state.get("scope_all", False)
-    filter_text = ""
+    filter_text = state.get("filter_text", "")
     filter_prompt = False
     filter_buffer = ""
     status = ""
@@ -2164,14 +2164,16 @@ def _pick_save(stdscr, state=None):
                 action = _confirm_bak(stdscr, chosen)
                 if action == "edit":
                     state.update(selected=selected, scroll=scroll,
-                                 by_name=by_name, scope_all=scope_all)
+                                 by_name=by_name, scope_all=scope_all,
+                                 filter_text=filter_text)
                     return chosen
                 if action == "restore":
                     ok, msg = _restore_bak(chosen)
                     status = msg
                 continue
             state.update(selected=selected, scroll=scroll,
-                         by_name=by_name, scope_all=scope_all)
+                         by_name=by_name, scope_all=scope_all,
+                         filter_text=filter_text)
             return chosen
 
 
@@ -2382,6 +2384,8 @@ def _interactive_edit(stdscr, data, path, save_root=None):
                     ("Ctrl+U / Ctrl+D", "page up / page down"),
                     ("Home / End", "first / last"),
                     ("/", "filter entries (ESC clears)"),
+                    ("", "a filter belongs to one level: it drops when you"),
+                    ("", "descend and comes back when you return"),
                     (":", "jump to a path, e.g. itemManager.items[0]._count"),
                 ],
             },
@@ -2646,6 +2650,7 @@ def _interactive_edit(stdscr, data, path, save_root=None):
                         stack.clear()
                         current, current_path_str = node, target
                         selected = scroll = 0
+                        filter_text = ""
                         status_msg = f"jumped to {target}"
                     else:
                         status_msg = f"no such path: {target}"
@@ -2724,6 +2729,7 @@ def _interactive_edit(stdscr, data, path, save_root=None):
                 current = data
                 current_path_str = "root"
                 selected = scroll = 0
+                filter_text = ""
                 saved_flag = True
                 status_msg = f"undo ({len(undo_stack)} left)"
             else:
@@ -2736,6 +2742,7 @@ def _interactive_edit(stdscr, data, path, save_root=None):
                 current = data
                 current_path_str = "root"
                 selected = scroll = 0
+                filter_text = ""
                 saved_flag = True
                 status_msg = "redo"
             else:
@@ -2824,7 +2831,8 @@ def _interactive_edit(stdscr, data, path, save_root=None):
                     else:
                         idx = int(name[1:-1])
                         child = current[idx]
-                    stack.append((current, name, child, current_path_str, selected))
+                    stack.append((current, name, child, current_path_str,
+                                  selected, filter_text))
                     if isinstance(current, dict):
                         current_path_str = f"{current_path_str}.{name}"
                     else:
@@ -2832,6 +2840,13 @@ def _interactive_edit(stdscr, data, path, save_root=None):
                     current = child
                     selected = 0
                     scroll = 0
+                    # The filter belongs to the level it was typed at. Left
+                    # set, it would hide nearly every key of the record you
+                    # just opened. It rides along in the stack frame so
+                    # backing out brings it straight back.
+                    if filter_text:
+                        status_msg = f"/{filter_text} stays with the level above"
+                        filter_text = ""
                 elif kind == "scalar":
                     if isinstance(current, dict):
                         edit_parent = current
@@ -2974,11 +2989,14 @@ def _interactive_edit(stdscr, data, path, save_root=None):
                 edit_parent = None
                 edit_dirty = False
             elif stack:
-                parent, key, child, path_str, sel = stack.pop()
+                parent, key, child, path_str, sel, filt = stack.pop()
                 current = parent
                 current_path_str = path_str
                 selected = sel
                 scroll = max(0, selected - 3)
+                filter_text = filt
+                if filter_text:
+                    status_msg = f"/{filter_text} restored"
             elif saved_flag and not quit_confirm:
                 quit_confirm = True
                 status_msg = ("UNSAVED CHANGES - back again to leave anyway, "
@@ -3011,11 +3029,14 @@ def _interactive_edit(stdscr, data, path, save_root=None):
                 selected = scroll = 0
                 status_msg = "filter cleared"
             elif stack:
-                parent, key, child, path_str, sel = stack.pop()
+                parent, key, child, path_str, sel, filt = stack.pop()
                 current = parent
                 current_path_str = path_str
                 selected = sel
                 scroll = max(0, selected - 3)
+                filter_text = filt
+                if filter_text:
+                    status_msg = f"/{filter_text} restored"
             else:
                 # Deliberately does NOT go up a level. Arrow keys arrive as
                 # ESC + '[' + letter, so a split read yields a bare ESC; if
