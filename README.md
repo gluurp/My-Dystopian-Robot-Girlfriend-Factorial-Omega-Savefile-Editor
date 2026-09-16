@@ -111,20 +111,35 @@ or the other, not both at once.
 
 ### Item rows
 
-Item rows show the name, the slot if it's equipped, the colour swatches,
-and how many you own:
+Item rows show the name, then one value column, then the slot if it's equipped:
 
 ```text
-BikiniBra (#14002)  slot=Bra  #111B1F #4D717F  x1
+BasicLegR (#3)                      x2
+BikiniBra (#14002)                  x1      slot=Bra
+TransparentBikiniPanties (#11004)   x1      slot=Panties
 ```
 
-Left to right is most important to least, because on a narrow terminal the end
-of the row gets cut off. So `x1` means one — the save stores a 0 for that, the
-row just does the plus one for you.
+`v` cycles that value column between **count**, **quality** and **colour**, so
+one field does the work of three:
 
-Quality isn't in the row at all. It sits at a flat 1.0 on clothes and modules,
-so it was a column of identical numbers saying nothing. Use `%q` when you
-actually want to find something by it.
+```text
+BasicLegR (#3)                      x2            ← count (default)
+BasicLegR (#3)                      q=0.699       ← quality
+BasicLegR (#3)                      #FFF0EC       ← colour
+```
+
+Three fields side by side would never fit — a count, a quality and five swatches
+need about 90 columns between them — so they take turns instead. That also means
+the value can sit in a **fixed column** and be scanned straight down the list,
+which ragged spacing never allowed. The name and the value are padded to fixed
+widths for exactly that reason; the slot trails behind, since an optional field
+in the middle would knock the value out of line on every unequipped row.
+
+`x1` means one — the save stores a 0 for that, the row does the plus one for
+you. Colour mode shows the first three swatches; open the item to see them all,
+with their alpha. Quality mode shows a flat `q=1.000` on clothes and modules,
+which is truthful rather than hidden — you asked for quality, so it shows the
+quality. Reach for `%q` when you want to *find* something by it.
 
 ### Moving between saves
 
