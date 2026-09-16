@@ -16,16 +16,19 @@ python3 mdrg-savefile-editor.py edit                            # pick a save fr
 python3 mdrg-savefile-editor.py edit full/path/to/slot.mdrgslot # ...or name one directly
 ```
 
-On Windows use   
+On Windows use this
+
 ```bash
 mdrg-savefile-editor.cmd scan
-```  
-instead, or  
+```
+
+or this if you must (top is preferred (sry to all my bottom fans (⋟﹏⋞) ))
+
 ```bash
 py mdrg-savefile-editor.py scan
 ```
 
-No save directory argument is forcibly necessary, rather the tool automatically detects it per platform.  
+No save directory argument is forcibly necessary, rather the tool automatically detects it per platform.
 But when you name a specific file, always operates on that file's own folder.
 
 ## Commands
@@ -49,7 +52,7 @@ But when you name a specific file, always operates on that file's own folder.
 ### Editing
 
 `edit` is the interactive curses TUI editor. You can navigate, edit scalars,
-add/delete items, rename, clone, and undo/redo.  
+add/delete items, rename, clone, and undo/redo.
 Give it no file argument and it lists the saves it can find: `.mdrgslot`
 and `.mdrg` files plus their `.bak` backups, so you can pick one:
 
@@ -72,7 +75,9 @@ backup copy somewhere else.
 Each row shows the file's size and last-modified date so you can spot the save
 you actually want. Backups are dimmed.
 
-**Mouse.** The wheel scrolls one row per notch
+### Mouse
+
+The wheel scrolls one row per notch.
 
 The buttons match the keys: **left click is forward** (like `d`) and **right
 click is back** (like `a`). A click acts on the current selection, not on the row
@@ -82,10 +87,10 @@ The one cost: with mouse reporting on, the terminal hands clicks and drags to
 the tool instead of selecting text itself, so drag-to-select needs **Shift**
 held. Most terminals still honour that.
 
-**Filtering.** `/` filters whatever section you're looking at. Plain text
-matches a row's name or its value, and whatever you type sticks to that
-section. Come back to it from above or below and the filter is still there.
-`ESC` clears it. (ESC is slightly different than a or arrow)
+### Filtering
+
+`/` filters whatever section you're looking at. Plain text matches a row's name or its value, and whatever you type sticks to that section. Come back to it from above or below and the filter is still there.
+`ESC` clears it. (ESC is slightly different than a or arrow left in that manner)
 
 For items you can compare numbers as well, which plain text can't reach since
 they aren't columns:
@@ -97,14 +102,16 @@ they aren't columns:
 | `%c>2` | more than 2 owned |
 | `%c=1` | exactly 1 owned |
 
-`%q` is quality, `%c` is how many you own — the same number the row shows, so a
+`%q` is quality, `%c` is how many you own, the same number the row shows, so a
 filter never disagrees with what you can see. `%quality` and `%count` spell it
 out if you'd rather. `<` `<=` `>` `>=` `=` `==` `!=` all work.
 
 A `%` filter replaces the text match instead of combining with it, so it's one
 or the other, not both at once.
 
-**Item rows** show the name, the slot if it's equipped, the colour swatches,
+### Item rows
+
+Item rows show the name, the slot if it's equipped, the colour swatches,
 and how many you own:
 
 ```text
@@ -119,18 +126,38 @@ Quality isn't in the row at all. It sits at a flat 1.0 on clothes and modules,
 so it was a column of identical numbers saying nothing. Use `%q` when you
 actually want to find something by it.
 
-**Moving between saves**   
-The list and the editor are two levels of one
-navigation model. Backing out of a file's root (`a` or `←`) returns you to the
-list, so you can hop between saves without quitting and re-running the tool.  
-Back goes up exactly one level at a time, just like it does between sections
-inside a file.
+### Moving between saves
+
+The list and the editor are two levels of one navigation model. Backing out of a file's root (`a` or `←`) returns you to the list, so you can hop between saves without quitting and re-running the tool.
+Back goes up exactly one level at a time, just like it does between sections inside a file.
 
 `ESC` deliberately does *not* go up a level. Arrow keys arrive as
 `ESC` + `[` + letter, so a split read can deliver a bare `ESC`. If that
 navigated, a stray arrow press would bounce you out of the file mid-edit.
 
-**Backups.** Pressing `Enter` on a `.bak` asks what you want to do with it:
+### Reordering
+
+`m` picks an entry up, `w`/`s` carry it, `m` again drops it where it stands.
+The row in hand is marked so you can see what you're carrying:
+
+```text
+ ✥ [7]   StockingR (#12001)  slot=StockingR  #832746  x2
+```
+
+Nothing is written until you drop it. The entry stays exactly where it was in
+the file the whole time — the row is only *drawn* in its new place — so
+cancelling costs nothing at all. **Every key except up/down cancels** the grab,
+navigation keys included, so you can't leave a half-moved entry behind by
+wandering off. The cancelling key is swallowed: one stray press cancels and
+does nothing else, rather than cancelling *and* deleting something.
+
+Reordering needs a list — `itemManager.items`, `sets` — not a dict, and it
+wants the filter cleared first, since a filtered view doesn't line up with the
+file's own indices.
+
+### Backups
+
+Pressing `Enter` on a `.bak` asks what you want to do with it:
 
 | Choice | What happens |
 |---|---|
@@ -144,10 +171,10 @@ If no save directory exists at all, it prints the paths it checked instead of
 failing silently, so you can see where it looked and point it somewhere with
 `MDRG_SAVES_DIR`.
 
-So say you edit `M1.mdrgslot` and brick it.  
-You'll have `M1.mdrgslot` (modified) and `M1.mdrgslot.bak`.  
-Then you restore `M1.mdrgslot.bak`.  
-You'll have `M1.mdrgslot` (original) and `M1.mdrgslot.prerestore`.  
+So say you edit `M1.mdrgslot` and brick it.
+You'll have `M1.mdrgslot` (modified) and `M1.mdrgslot.bak`.
+Then you restore `M1.mdrgslot.bak`.
+You'll have `M1.mdrgslot` (original) and `M1.mdrgslot.prerestore`.
 -- I also havent really tested this lmk if its broken pls (~_~;).
 
 ### Data manipulation
@@ -200,7 +227,7 @@ Your save isn't written to until you save it, it's copied to a temp dir
 | macOS | `~/Library/Application Support/unity3d/IncontinentCell/My Dystopian Robot Girlfriend/Saves/` |
 | Linux | `~/.config/unity3d/IncontinentCell/My Dystopian Robot Girlfriend/Saves/` |
 
-# Extra notes to be aware of
+## Extra notes to be aware of
 
-Item count starts at 0, so if you have a single slip dress thats unique in color, itll still have count 0  
-Items with unique stats (colors/wear/damage/etc) are counted separately
+- Item count starts at 0, so if you have a single slip dress thats unique in color, itll still have count 0
+- Items with unique stats (colors/wear/damage/etc) are counted separately

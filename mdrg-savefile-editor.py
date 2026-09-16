@@ -2074,6 +2074,14 @@ def _nudge(step, selected, total):
     return selected
 
 
+def _grab_status(label, grab_from, grab_pos):
+    """One-line description of a pending grab, for the status row."""
+    off = grab_pos - grab_from
+    where = "unmoved" if not off else f"{off:+d} row" + ("s" if abs(off) > 1 else "")
+    return (f"grabbed {label}  ({where})  "
+            f"w/s carry it, m drops it, any other key cancels")
+
+
 def _confirm_bak(stdscr, bak):
     """Modal for a .bak file. Returns 'edit', 'restore' or None
 
@@ -2323,7 +2331,6 @@ def _pick_save(stdscr, state=None):
         if key == curses.KEY_RESIZE:
             continue
 
-        # --- filter prompt swallows keys ------------------------------
         if filter_prompt:
             if key in (curses.KEY_ENTER, ord("\n"), ord("\r")):
                 filter_text = filter_buffer
@@ -2426,7 +2433,7 @@ def cmd_edit(args):
 
     while True:
         if chosen is None:
-            # Level 0: choose a file.
+            # level 0: choose a file.
             if not _candidate_dirs():
                 _report_no_save_dir()
                 sys.exit(1)
@@ -2440,7 +2447,7 @@ def cmd_edit(args):
             if chosen is None:
                 sys.exit(0)        # cancelled at the list
 
-        # Level 1 and deeper: the file itself.
+        # level 1 and deeper: the file itself
         data = load_data(chosen)
         edit_data = data
         if file_type(chosen.name) == "old_save":
@@ -2530,9 +2537,15 @@ def _interactive_edit(stdscr, data, path, save_root=None):
     status_msg = ""
     last_was_nudge = False
     quit_confirm = False
+    # Grab-and-move. The DATA is not touched until the grab is dropped: these
+    # hold only where an entry came from and where it is being carried to, so
+    # every way of cancelling is just forgetting three values.
+    grab_from = None
+    grab_pos = None
+    grab_label = ""
 
     def remember_filter(path_str, text):
-        """Store a level's filter - or drop the entry when it is cleared.
+        """Store a level's filter - or drop the entry when it is cleared
 
         An empty filter is never stored, so the dict only ever holds levels you
         actually filtered. This is the single write point for BOTH ways a
@@ -2545,7 +2558,7 @@ def _interactive_edit(stdscr, data, path, save_root=None):
             filters.pop(path_str, None)
 
     def recall_filter(path_str):
-        """The filter a level was left with ("" when it never had one)."""
+        """The filter a level was left with ("" when it never had one)"""
         return filters.get(path_str, "")
 
     def snapshot():
@@ -2620,6 +2633,14 @@ def _interactive_edit(stdscr, data, path, save_root=None):
             selected = max(0, len(children) - 1)
             scroll = 0
 
+        # While an entry is grabbed, draw it at the position it is being
+        # carried to. Display only - the data still holds it in its original
+        # slot, which is what makes cancelling a grab free.
+        if grab_from is not None:
+            order = list(range(len(children)))
+            order.insert(grab_pos, order.pop(grab_from))
+            children = [children[i] for i in order]
+
         if filter_text:
             pos = f" [{selected + 1}/{len(children)}/{total_children}]" if children else f" [0/{total_children}]"
         else:
@@ -2665,6 +2686,8 @@ def _interactive_edit(stdscr, data, path, save_root=None):
                     ("H", "colour: enter #RRGGBB"),
                     ("n", "add a key (dict) or append a value (list)"),
                     ("r", "rename the selected key"),
+                    ("m", "grab the entry, w/s carry it, m drops it"),
+                    ("", "any other key cancels the grab"),
                     ("x", "delete the selected key / list entry"),
                     ("c", "clone entry (fresh guid for items)"),
                     ("y / p", "yank value / paste into the selection"),
@@ -2801,6 +2824,9 @@ def _interactive_edit(stdscr, data, path, save_root=None):
             if i < 0 or i >= len(children):
                 continue
             name, icon, type_str, val_str, kind = children[i]
+            if grab_from is not None and i == grab_pos:
+                # the row being carried, so it reads as picked up
+                icon = "\u2725" if _UNI else "*"
             line = f" {icon} {name:<28} {type_str:>12}  {val_str}"
             line = line[: w - 1]
             attr = 0
@@ -2816,7 +2842,7 @@ def _interactive_edit(stdscr, data, path, save_root=None):
                 pass
 
         footer = (
-            " ↑↓←→:nav  /:filter  ::jump  e:edit  r:rename  x:del  "
+            " ↑↓←→:nav  /:filter  ::jump  e:edit  r:rename  m:grab  x:del  "
             "c:clone  y/p  n:add  u:undo  ?:help  o:save  q:quit "
         )
         if is_color_dict(current):
@@ -2969,6 +2995,49 @@ def _interactive_edit(stdscr, data, path, save_root=None):
                     rename_buffer += chr(key)
             continue
 
+        # Grab mode. Up/down carry the entry around; the grab key drops it
+        # where it stands; ANY other key is the cancel button. Cancelling is
+        # free because the data has not been touched yet.
+        if grab_from is not None:
+            if key == curses.KEY_MOUSE:
+                event = _mouse_event()
+                if event == "up":
+                    key = curses.KEY_UP
+                elif event == "down":
+                    key = curses.KEY_DOWN
+                else:
+                    grab_from = grab_pos = None
+                    status_msg = "grab cancelled"
+                    continue
+
+            if key in (curses.KEY_UP, ord("w"), ord("W")):
+                grab_pos = max(0, grab_pos - 1)
+                selected = grab_pos
+                scroll = min(scroll, selected)
+                status_msg = _grab_status(grab_label, grab_from, grab_pos)
+            elif key in (curses.KEY_DOWN, ord("s"), ord("S")):
+                grab_pos = min(len(children) - 1, grab_pos + 1)
+                selected = grab_pos
+                if selected >= scroll + visible:
+                    scroll = selected - visible + 1
+                status_msg = _grab_status(grab_label, grab_from, grab_pos)
+            elif key in (ord("m"), ord("M")):
+                if grab_pos != grab_from:
+                    snapshot()
+                    current.insert(grab_pos, current.pop(grab_from))
+                    saved_flag = True
+                status_msg = ("grab dropped, nothing moved" if grab_pos == grab_from
+                              else f"moved to {grab_pos + 1} of {len(children)}")
+                grab_from = grab_pos = None
+                grab_label = ""
+            else:
+                # Swallowed rather than passed on: one stray key should cancel
+                # and do nothing else, never cancel and also delete something.
+                grab_from = grab_pos = None
+                grab_label = ""
+                status_msg = "grab cancelled"
+            continue
+
         # Mouse: a wheel notch is one row, and the buttons mean what the arrow
         # keys mean - left click forward, right click back. Rewriting `key`
         # hands the work to the normal handlers below, so the mouse and the
@@ -3084,6 +3153,15 @@ def _interactive_edit(stdscr, data, path, save_root=None):
                     status_msg = f"deleted {name}"
                 except Exception as e:
                     status_msg = f"delete failed: {e}"
+        elif key in (ord("m"), ord("M")):  # grab an entry to reorder it
+            if filter_text:
+                status_msg = "clear the filter before reordering"
+            elif not isinstance(current, list) or not children:
+                status_msg = "reordering needs a list of entries"
+            else:
+                grab_from = grab_pos = selected
+                grab_label = str(children[selected][3])[:34]
+                status_msg = _grab_status(grab_label, grab_from, grab_pos)
         elif key == ord("r"):  # rename
             if selected < len(children) and isinstance(current, dict):
                 rename_prompt = True
