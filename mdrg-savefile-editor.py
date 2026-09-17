@@ -488,16 +488,18 @@ def _is_likely_json(path):
         return False
 
 
+class SaveFileError(Exception):
+    pass
+
+
 def load_json(path):
     try:
         with open(path, "r", encoding="utf-8") as f:
             return json.load(f)
     except FileNotFoundError:
-        print(f"Error: file not found: {path}", file=sys.stderr)
-        sys.exit(1)
+        raise SaveFileError(f"file not found: {path}")
     except json.JSONDecodeError as e:
-        print(f"Error: invalid JSON in {path}: {e}", file=sys.stderr)
-        sys.exit(1)
+        raise SaveFileError(f"invalid JSON in {path}: {e}")
 
 
 def load_data(path):
@@ -4402,7 +4404,11 @@ def main():
     handler = cmds.get(args.command)
     if handler is None:
         parser.error(f"Unknown command: {args.command}")
-    sys.exit(handler(args) or 0)
+    try:
+        sys.exit(handler(args) or 0)
+    except SaveFileError as e:
+        print(f"Error: {e}", file=sys.stderr)
+        sys.exit(1)
 
 if __name__ == "__main__":
     main()
