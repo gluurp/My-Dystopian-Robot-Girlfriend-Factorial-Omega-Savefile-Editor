@@ -2520,6 +2520,74 @@ def _handle_grab_key(key, grab_from, grab_pos, children, current,
             status_msg, grab_label, True)
 
 
+def _handle_edit_key(key, edit_mode, edit_buffer, edit_key, edit_parent,
+                       edit_dirty, snapshot, saved_flag, status_msg,
+                       stdscr, h, w):
+    """Handle a key press while in edit mode.
+
+    Returns: (edit_mode, edit_buffer, edit_key, edit_parent, edit_dirty,
+              saved_flag, status_msg, continue_flag)
+    """
+    if key == 27:  # ESC
+        return (False, "", "", None, False, saved_flag,
+                status_msg, True)
+    elif key in (10, 13):  # Enter
+        if edit_parent is not None and edit_key is not None:
+            is_chan = (edit_key in _COLOR_KEYS and is_color_dict(edit_parent))
+            if is_chan and not edit_dirty:
+                new_val = edit_parent[edit_key]
+            elif is_chan:
+                new_val = coerce_color(edit_buffer, edit_parent[edit_key])
+            else:
+                new_val = parse_value(edit_buffer)
+            try:
+                snapshot()
+                edit_parent[edit_key] = new_val
+                saved_flag = True
+            except Exception as e:
+                try:
+                    stdscr.addstr(h - 2, 0, f" Error: {e}"[: w - 1],
+                                  curses.color_pair(4))
+                    stdscr.refresh()
+                    curses.napms(1000)
+                except Exception as e2:
+                    print(f"Error: {e2}", file=sys.stderr)
+        return (False, "", "", None, False, saved_flag, status_msg, True)
+    elif key in (9,):  # Tab for toggle type / colour representation
+        if edit_parent is not None and edit_key is not None:
+            cur = edit_parent.get(edit_key) if isinstance(edit_parent, dict) else None
+            is_colour_channel = (
+                edit_key in _COLOR_KEYS
+                and is_color_dict(edit_parent)
+                and isinstance(cur, (int, float))
+            )
+            if is_colour_channel:
+                edit_buffer = (f"{float(cur):.6g}" if edit_buffer.strip() == str(to255(cur))
+                               else str(to255(cur)))
+            elif isinstance(cur, bool):
+                edit_buffer = "false" if cur else "true"
+            elif isinstance(cur, int):
+                edit_buffer = str(float(cur))
+            elif isinstance(cur, float):
+                edit_buffer = str(int(cur))
+            elif isinstance(cur, str):
+                edit_buffer = repr(cur)
+        return (edit_mode, edit_buffer, edit_key, edit_parent, edit_dirty,
+                saved_flag, status_msg, True)
+    elif key in (curses.KEY_BACKSPACE, 127, 8):
+        edit_buffer = edit_buffer[:-1]
+        edit_dirty = True
+        return (edit_mode, edit_buffer, edit_key, edit_parent, edit_dirty,
+                saved_flag, status_msg, True)
+    elif key >= 32 and key < 127:
+        edit_buffer += chr(key)
+        edit_dirty = True
+        return (edit_mode, edit_buffer, edit_key, edit_parent, edit_dirty,
+                saved_flag, status_msg, True)
+    return (edit_mode, edit_buffer, edit_key, edit_parent, edit_dirty,
+            saved_flag, status_msg, False)
+
+
 def _interactive_edit(stdscr, data, path, save_root=None):
     """Curses-based interactive editor.
 
@@ -2989,64 +3057,13 @@ def _interactive_edit(stdscr, data, path, save_root=None):
             last_was_nudge = False
 
         if edit_mode:
-            if key == 27:  # ESC
-                edit_mode = False
-                edit_buffer = ""
-                edit_key = ""
-                edit_parent = None
-                edit_dirty = False
-            elif key in (10, 13):  # Enter
-                if edit_parent is not None and edit_key is not None:
-                    is_chan = (edit_key in _COLOR_KEYS and is_color_dict(edit_parent))
-                    if is_chan and not edit_dirty:
-                        new_val = edit_parent[edit_key]
-                    elif is_chan:
-                        new_val = coerce_color(edit_buffer, edit_parent[edit_key])
-                    else:
-                        new_val = parse_value(edit_buffer)
-                    try:
-                        snapshot()
-                        edit_parent[edit_key] = new_val
-                        saved_flag = True
-                    except Exception as e:
-                        try:
-                            stdscr.addstr(h - 2, 0, f" Error: {e}"[: w - 1], curses.color_pair(4))
-                            stdscr.refresh()
-                            curses.napms(1000)
-                        except Exception as e2:
-                            print(f"Error: {e2}", file=sys.stderr)
-                edit_mode = False
-                edit_buffer = ""
-                edit_key = ""
-                edit_parent = None
-                edit_dirty = False
-            elif key in (9,):  # Tab for toggle type / colour representation
-                if edit_parent is not None and edit_key is not None:
-                    cur = edit_parent.get(edit_key) if isinstance(edit_parent, dict) else None
-                    is_colour_channel = (
-                        edit_key in _COLOR_KEYS
-                        and is_color_dict(edit_parent)
-                        and isinstance(cur, (int, float))
-                    )
-                    if is_colour_channel:
-                        # flip between the 0..255 view and the stored 0..1 float
-                        edit_buffer = (f"{float(cur):.6g}" if edit_buffer.strip() == str(to255(cur))
-                                       else str(to255(cur)))
-                    elif isinstance(cur, bool):
-                        edit_buffer = "false" if cur else "true"
-                    elif isinstance(cur, int):
-                        edit_buffer = str(float(cur))
-                    elif isinstance(cur, float):
-                        edit_buffer = str(int(cur))
-                    elif isinstance(cur, str):
-                        edit_buffer = repr(cur)
-            elif key in ( curses.KEY_BACKSPACE, 127, 8):
-                edit_buffer = edit_buffer[:-1]
-                edit_dirty = True
-            elif key >= 32 and key < 127:
-                edit_buffer += chr(key)
-                edit_dirty = True
-            continue
+            edit_mode, edit_buffer, edit_key, edit_parent, edit_dirty, \
+                saved_flag, status_msg, cont = _handle_edit_key(
+                key, edit_mode, edit_buffer, edit_key, edit_parent,
+                edit_dirty, snapshot, saved_flag, status_msg,
+                stdscr, h, w)
+            if cont:
+                continue
 
         # prompt modes (filter / jump / rename)
         if filter_prompt or jump_prompt or rename_prompt:
