@@ -1319,13 +1319,13 @@ def parse_path(path_str: str) -> list:
             if current:
                 parts.append(("dict", current))
                 current = ""
-            else:
-                raise ValueError(f"Empty key at position {i}")
         elif ch == "[":
             if not current:
                 raise ValueError(f"Empty key before '[' at position {i}")
             if "]" not in path_str[i:]:
                 raise ValueError(f"Unmatched '[' in path at position {i}")
+            parts.append(("dict", current))
+            current = ""
             j = path_str.index("]", i)
             idx = int(path_str[i + 1 : j])
             parts.append(("list", idx))
@@ -2040,12 +2040,6 @@ def _enable_mouse():
     except Exception:
         return False
     try:
-        # Without this, ncurses holds a button press for the click-resolution
-        # interval before reporting it, because it is working out whether the
-        # press is part of a click. That interval defaults to 200ms and was
-        # measured at 166ms per click - a visible lag on every click. The wheel
-        # is unaffected, since a wheel notch is not clickable. We only ever read
-        # the _PRESSED bits, so turn the resolution off entirely.
         curses.mouseinterval(0)
     except Exception:
         pass
@@ -2491,11 +2485,11 @@ def _handle_save_keypress(key, path, save_root, stdscr, h, w):
 
 
 def _handle_grab_key(key, grab_from, grab_pos, children, current,
-                       selected, scroll, visible, saved_flag,
-                       status_msg, grab_label):
+                        selected, scroll, visible, saved_flag,
+                        status_msg, grab_label, snapshot):
     """Handle a key press while grabbing an entry.
 
-    Returns: (grab_from, grab_pos, selected, scroll, saved_flag,
+Returns: (grab_from, grab_pos, selected, scroll, saved_flag,
               status_msg, grab_label, still_grabbing)
     """
     import curses
@@ -2545,6 +2539,7 @@ def _handle_edit_key(key, edit_mode, edit_buffer, edit_key, edit_parent,
     Returns: (edit_mode, edit_buffer, edit_key, edit_parent, edit_dirty,
               saved_flag, status_msg, continue_flag)
     """
+    import curses
     if key == 27:  # ESC
         return (False, "", "", None, False, saved_flag,
                 status_msg, True)
@@ -2662,6 +2657,7 @@ def _handle_quit(key, st, recall_filter):
     'clear_filter' (ESC clears filter), 'back_one' (ESC up one level),
     'root_msg' (ESC at root)
     """
+    import curses
     if key in (ord("a"), curses.KEY_LEFT):
         if st['edit_mode']:
             st['edit_mode'] = False
@@ -2713,6 +2709,7 @@ def _handle_quit(key, st, recall_filter):
             st['edit_dirty'] = False
             return "cancel_edit"
         elif st.get('filter_text'):
+            remember_filter(st['current_path_str'], "")
             st['filter_text'] = ""
             st['selected'] = 0
             st['scroll'] = 0
@@ -2941,7 +2938,11 @@ def _handle_special_keys(key, st, children, snapshot, recall_filter,
                     idx = int(nm[1:-1])
                     st['edit_parent'] = st['current']
                     st['edit_key'] = str(idx)
-                st['edit_buffer'] = edit_prefill(st['edit_parent'], st['edit_key'])
+                st['edit_target'] = (
+                    st['current'][nm] if isinstance(st['current'], dict)
+                    else st['current'][idx]
+                )
+                st['edit_buffer'] = edit_prefill(st['edit_parent'], st['edit_key'], st['edit_target'])
                 st['edit_mode'] = True
                 st['edit_dirty'] = False
     elif key == ord("e") or key == ord("E"):
@@ -3104,6 +3105,8 @@ def _render_screen(st, stdscr, h, w, mods, path):
     else:
         pos = (f" [{st['selected'] + 1}/{total_children}]"
                if children else " [0/0]")
+    st['children'] = children
+    st['total_children'] = total_children
     filt = f"  /{st['filter_text']}" if st['filter_text'] else ""
     try:
         hdr = (f" mdrg-savefile-editor edit {DASH} {path.name}{pos}{filt} ")
@@ -3282,6 +3285,7 @@ def _render_screen(st, stdscr, h, w, mods, path):
         start_row = row + 4
 
     visible = max(1, h - start_row - 2)
+    st['visible'] = visible
     end = min(st['scroll'] + visible, len(children))
     for i in range(st['scroll'], end):
         if i < 0 or i >= len(children):
@@ -3371,6 +3375,7 @@ def _interactive_edit(stdscr, data: Any, path: Path, save_root: Any = None) -> A
     edit_key = ""
     edit_parent = None
     edit_dirty = False
+    edit_target = None
     saved_flag = False
     mods = mod_names(data)
     load_item_names()
@@ -3460,6 +3465,7 @@ def _interactive_edit(stdscr, data: Any, path: Path, save_root: Any = None) -> A
         node, done = data, 0
         parts = []            # (kind, key) pairs, the shape format_path wants
         rebuilt = []
+        pred = parse_item_filter(filter_text)[0]
         for k in keys:
             if isinstance(node, list):
                 if not isinstance(k, int) or not 0 <= k < len(node):
@@ -3470,7 +3476,7 @@ def _interactive_edit(stdscr, data: Any, path: Path, save_root: Any = None) -> A
                     break
                 kind, name, sel = "dict", k, 0
                 for other in node:
-                    if not keep(node[other]):
+                    if not keep_filter(node[other], pred):
                         continue
                     if other == k:
                         break
@@ -3530,8 +3536,9 @@ def _interactive_edit(stdscr, data: Any, path: Path, save_root: Any = None) -> A
             'jump_buffer': jump_buffer, 'rename_buffer': rename_buffer,
             'edit_mode': edit_mode, 'edit_key': edit_key,
             'edit_buffer': edit_buffer, 'edit_parent': edit_parent,
-            'grab_from': grab_from, 'grab_pos': grab_pos,
-            'last_was_nudge': last_was_nudge,
+'grab_from': grab_from, 'grab_pos': grab_pos,
+            'last_was_nudge': last_was_nudge, 'visible': None,
+            'children': None,
         }
         if _render_screen(st, stdscr, h, w, mods, path):
             continue
@@ -3557,6 +3564,8 @@ def _interactive_edit(stdscr, data: Any, path: Path, save_root: Any = None) -> A
         grab_from = st['grab_from']
         grab_pos = st['grab_pos']
         last_was_nudge = st['last_was_nudge']
+        visible = st['visible']
+        children = st['children']
         key = stdscr.getch()
         if key == curses.KEY_RESIZE:
             continue
@@ -3601,18 +3610,16 @@ def _interactive_edit(stdscr, data: Any, path: Path, save_root: Any = None) -> A
             current_path_str = st['current_path_str']
             status_msg = st['status_msg']
             saved_flag = st['saved_flag']
-            if not still:
-                continue
+            continue
 
         if grab_from is not None:
             grab_from, grab_pos, selected, scroll, saved_flag, \
-                status_msg, grab_label, still_grabbing = \
+                status_msg, grab_label, _still = \
                 _handle_grab_key(key, grab_from, grab_pos,
                                  children, current, selected,
                                  scroll, visible, saved_flag,
-                                 status_msg, grab_label)
-            if still_grabbing:
-                continue
+                                 status_msg, grab_label, snapshot)
+            continue
 
         selected, scroll, key = _handle_movement(
             key, selected, scroll, visible, children)
@@ -3637,47 +3644,6 @@ def _interactive_edit(stdscr, data: Any, path: Path, save_root: Any = None) -> A
                 status_msg = time_travel(redo_stack, undo_stack, "redo")
             else:
                 status_msg = "nothing to redo"
-        elif key == ord("y"):  # yank
-            sk_st = {
-                'yank_buf': yank_buf, 'status_msg': status_msg,
-                'saved_flag': saved_flag, 'selected': selected,
-                'scroll': scroll, 'current': current,
-                'stack': stack, 'current_path_str': current_path_str,
-                'filter_text': filter_text, 'edit_mode': edit_mode,
-                'edit_buffer': edit_buffer, 'edit_key': edit_key,
-                'edit_parent': edit_parent, 'edit_dirty': edit_dirty,
-                'edit_target': edit_target, 'grab_from': grab_from,
-                'grab_pos': grab_pos, 'grab_label': grab_label,
-                'detail_mode': detail_mode, 'last_was_nudge': last_was_nudge,
-                'rename_prompt': rename_prompt, 'rename_buffer': rename_buffer,
-                'rename_target': rename_target,
-            }
-            _handle_special_keys(
-                key, sk_st, children, snapshot, recall_filter,
-                stdscr, h, w)
-            yank_buf = sk_st['yank_buf']
-            status_msg = sk_st['status_msg']
-            saved_flag = sk_st['saved_flag']
-            selected = sk_st['selected']
-            scroll = sk_st['scroll']
-            current = sk_st['current']
-            stack = sk_st['stack']
-            current_path_str = sk_st['current_path_str']
-            filter_text = sk_st['filter_text']
-            edit_mode = sk_st['edit_mode']
-            edit_buffer = sk_st['edit_buffer']
-            edit_key = sk_st['edit_key']
-            edit_parent = sk_st['edit_parent']
-            edit_dirty = sk_st['edit_dirty']
-            edit_target = sk_st['edit_target']
-            grab_from = sk_st['grab_from']
-            grab_pos = sk_st['grab_pos']
-            grab_label = sk_st['grab_label']
-            detail_mode = sk_st['detail_mode']
-            last_was_nudge = sk_st['last_was_nudge']
-            rename_prompt = sk_st['rename_prompt']
-            rename_buffer = sk_st['rename_buffer']
-            rename_target = sk_st['rename_target']
         elif key in (ord("o"), ord("O"), 19):  # 19 = Ctrl+S
             if _handle_save_keypress(key, path, save_root, stdscr, h, w):
                 saved_flag = False
@@ -3751,6 +3717,49 @@ def _interactive_edit(stdscr, data: Any, path: Path, save_root: Any = None) -> A
             status_msg = st['status_msg']
             if action in ("cancel_edit", "clear_filter", "back_one", "root_msg"):
                 pass
+        else:
+            # everything else: yank/paste/delete/clone/enter/edit/
+            # colour adjust/hex/add/rename/grab-start
+            sk_st = {
+                'yank_buf': yank_buf, 'status_msg': status_msg,
+                'saved_flag': saved_flag, 'selected': selected,
+                'scroll': scroll, 'current': current,
+                'stack': stack, 'current_path_str': current_path_str,
+                'filter_text': filter_text, 'edit_mode': edit_mode,
+                'edit_buffer': edit_buffer, 'edit_key': edit_key,
+                'edit_parent': edit_parent, 'edit_dirty': edit_dirty,
+                'edit_target': edit_target, 'grab_from': grab_from,
+                'grab_pos': grab_pos, 'grab_label': grab_label,
+                'detail_mode': detail_mode, 'last_was_nudge': last_was_nudge,
+                'rename_prompt': rename_prompt, 'rename_buffer': rename_buffer,
+                'rename_target': rename_target,
+            }
+            _handle_special_keys(
+                key, sk_st, children, snapshot, recall_filter,
+                stdscr, h, w)
+            yank_buf = sk_st['yank_buf']
+            status_msg = sk_st['status_msg']
+            saved_flag = sk_st['saved_flag']
+            selected = sk_st['selected']
+            scroll = sk_st['scroll']
+            current = sk_st['current']
+            stack = sk_st['stack']
+            current_path_str = sk_st['current_path_str']
+            filter_text = sk_st['filter_text']
+            edit_mode = sk_st['edit_mode']
+            edit_buffer = sk_st['edit_buffer']
+            edit_key = sk_st['edit_key']
+            edit_parent = sk_st['edit_parent']
+            edit_dirty = sk_st['edit_dirty']
+            edit_target = sk_st['edit_target']
+            grab_from = sk_st['grab_from']
+            grab_pos = sk_st['grab_pos']
+            grab_label = sk_st['grab_label']
+            detail_mode = sk_st['detail_mode']
+            last_was_nudge = sk_st['last_was_nudge']
+            rename_prompt = sk_st['rename_prompt']
+            rename_buffer = sk_st['rename_buffer']
+            rename_target = sk_st['rename_target']
 
 
 def select_items(data: Any, selector: str) -> list:
