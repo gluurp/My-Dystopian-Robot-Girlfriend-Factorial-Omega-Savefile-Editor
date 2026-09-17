@@ -494,6 +494,7 @@ class SaveFileError(Exception):
 
 
 def load_json(path: Path) -> Any:
+    """Load a JSON file"""
     try:
         with open(path, "r", encoding="utf-8") as f:
             return json.load(f)
@@ -628,14 +629,17 @@ def ingame_time_str(seconds):
 
 
 def label_for(key):
+    """Return a display label for a key"""
     return LABELS.get(key, key)
 
 
 def is_scalar(v: Any) -> bool:
+    """True if v is a primitive JSON value"""
     return isinstance(v, (str, int, float)) and not isinstance(v, bool)
 
 
 def is_bool(v: Any) -> bool:
+    """True if v is a boolean"""
     return isinstance(v, bool)
 
 
@@ -1194,6 +1198,7 @@ def cmd_dump(args: Any) -> int:
     depth = args.depth
 
     def truncate(v, d):
+        """Truncate a nested value to depth d"""
         if d <= 0:
             if isinstance(v, (dict, list)):
                 return f"<{type(v).__name__} depth={depth}>"
@@ -1225,6 +1230,7 @@ def cmd_extract(args: Any) -> int:
     field = args.field
 
     def find(obj, key):
+        """Find a value by key in a nested structure"""
         if isinstance(obj, dict):
             if key in obj:
                 return obj[key]
@@ -1500,6 +1506,7 @@ ITEM_KEY_ORDER = [
 
 
 def qkeyorder(rec):
+    """Return quality-sorted keys for a record"""
     return {k: rec[k] for k in ITEM_KEY_ORDER if k in rec} | {
         k: v for k, v in rec.items() if k not in ITEM_KEY_ORDER}
 
@@ -1627,6 +1634,7 @@ def normalize_colors(data):
     fixes = []
 
     def walk(node, path, in_colors):
+        """Walk a nested structure collecting fix suggestions"""
         if isinstance(node, dict):
             if in_colors and is_color_dict(node):
                 for k in list(node.keys()):
@@ -1790,6 +1798,7 @@ def parse_item_filter(text):
     want = float(m.group(3))
 
     def pred(v):
+        """Return True if v matches the filter condition"""
         got = item_filter_field(v, field)
         return got is not None and op(got, want)
 
@@ -1956,6 +1965,7 @@ _BAK = ".bak"
 
 
 def _is_bak(p):
+    """True if path looks like a .bak file"""
     return p.name.endswith(_BAK)
 
 
@@ -2179,6 +2189,7 @@ def _pick_save(stdscr: Any, state: dict = None) -> Any:
     status = ""
 
     def files():
+        """List save files from directories"""
         src = dirs if scope_all else [primary]
         rows, seen = [], set()
         for d in src:
@@ -2195,6 +2206,7 @@ def _pick_save(stdscr: Any, state: dict = None) -> Any:
         return rows
 
     def action_label():
+        """Label for the back/save action"""
         if scope_all:
             return "←  Back to just the main save folder"
         extra = len(dirs) - 1
@@ -3408,6 +3420,7 @@ def _interactive_edit(stdscr, data: Any, path: Path, save_root: Any = None) -> A
         redo_stack.clear()
 
     def restore(snap):
+        """Restore data from a JSON snapshot"""
         new = json.loads(snap)
         if isinstance(data, dict):
             data.clear()
@@ -4137,6 +4150,7 @@ def cmd_tree(args: Any) -> int:
     out = []
 
     def walk(node, name, depth):
+        """Recursively walk a tree and append formatted lines"""
         pad = "  " * depth
         if isinstance(node, dict):
             if is_color_dict(node):
@@ -4221,6 +4235,7 @@ def collect_files(inputs):
 
 
 def main():
+    """Parse CLI arguments and dispatch to the appropriate command"""
     parser = argparse.ArgumentParser(
         prog="mdrg-savefile-editor",
         description="Inspect / rip apart My Dystopian Robot Girlfriend save files",
