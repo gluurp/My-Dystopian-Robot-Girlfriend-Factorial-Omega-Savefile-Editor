@@ -34,13 +34,14 @@ import zlib
 import datetime
 from pathlib import Path
 from collections import Counter
+from typing import Any
 
 
 IS_WINDOWS = sys.platform.startswith("win")
 IS_MAC = sys.platform == "darwin"
 
 
-def reconfigure_stdout():
+def reconfigure_stdout() -> None:
     """Ask for UTF-8 output on Windows so the nice glyphs work when possible"""
     if not IS_WINDOWS:
         return
@@ -54,7 +55,7 @@ def reconfigure_stdout():
 reconfigure_stdout()
 
 
-def _windows_console_utf8():
+def _windows_console_utf8() -> bool:
     """True when the Windows console is genuinely on the UTF-8 code page
 
     sys.stdout.encoding cannot answer this. reconfigure_stdout() has already
@@ -73,7 +74,7 @@ def _windows_console_utf8():
         return False
 
 
-def _console_is_unicode():
+def _console_is_unicode() -> bool:
     """True when stdout can encode the box-drawing glyphs we like to use"""
     if os.environ.get("MDRG_ASCII"):
         return False
@@ -440,7 +441,7 @@ def resolve_saves_dir(explicit=None, near=None):
     return candidate_save_dirs()[0]
 
 
-def cmd_where(args):
+def cmd_where(args: Any) -> int:
     """Show which save directories were checked and which one is in use"""
     print(f"platform : {'Windows' if IS_WINDOWS else 'macOS' if IS_MAC else 'Linux/other'}")
     print(f"python   : {sys.version.split()[0]}")
@@ -492,7 +493,7 @@ class SaveFileError(Exception):
     pass
 
 
-def load_json(path):
+def load_json(path: Path) -> Any:
     try:
         with open(path, "r", encoding="utf-8") as f:
             return json.load(f)
@@ -502,7 +503,7 @@ def load_json(path):
         raise SaveFileError(f"invalid JSON in {path}: {e}")
 
 
-def load_data(path):
+def load_data(path: Path) -> Any:
     """Load JSON and normalize embedded savedata strings into objects"""
     data = load_json(path)
     ft = file_type(path.name)
@@ -524,7 +525,7 @@ def load_data(path):
     return data
 
 
-def analysis_records(path, data=None):
+def analysis_records(path: Path, data: Any = None) -> list:
     """Return gameplay records, including records embedded in old save files"""
     path = Path(path)
     data = data if data is not None else load_data(path)
@@ -537,7 +538,7 @@ def analysis_records(path, data=None):
     return []
 
 
-def format_analysis(path, record):
+def format_analysis(path: Path, record: Any) -> str:
     """Build a concise, human-readable summary for the analyze/report views"""
     path = Path(path)
     lines = [f"=== {path.name} ==="]
@@ -585,7 +586,7 @@ def save_data(path, data):
     return bak
 
 
-def file_type(path):
+def file_type(path: Path) -> str:
     """Classify a file in the Saves directory"""
     p = Path(path).name
     if p == "save.mdrg":
@@ -630,11 +631,11 @@ def label_for(key):
     return LABELS.get(key, key)
 
 
-def is_scalar(v):
+def is_scalar(v: Any) -> bool:
     return isinstance(v, (str, int, float)) and not isinstance(v, bool)
 
 
-def is_bool(v):
+def is_bool(v: Any) -> bool:
     return isinstance(v, bool)
 
 
@@ -643,7 +644,7 @@ def num(v, default=0):
     return v if v is not None else default
 
 
-def cmd_scan(args):
+def cmd_scan(args: Any) -> int:
     """Scan a Saves directory and list all files"""
     directory = resolve_saves_dir(getattr(args, "directory", None))
     if not directory.is_dir():
@@ -712,7 +713,7 @@ def cmd_scan(args):
         print(f"{f.name:<60} {ft:<14} {size:>10} {summary}")
 
 
-def cmd_info(args):
+def cmd_info(args: Any) -> int:
     """Show structure/keys of a file"""
     path = Path(args.file)
     data = load_data(path)
@@ -808,7 +809,7 @@ def cmd_info(args):
             print(f"  {e['Key']}: {e['Value']}")
 
 
-def cmd_stats(args):
+def cmd_stats(args: Any) -> int:
     """Show key stats from a slot file"""
     path = Path(args.file)
     data = load_data(path)
@@ -878,7 +879,7 @@ def cmd_stats(args):
             print(f"  {label_for(k):<30} {v}")
 
 
-def cmd_analyze(args):
+def cmd_analyze(args: Any) -> int:
     """Analyze one or more save files using the shared normalized format"""
     results = []
     for name in args.files:
@@ -896,7 +897,7 @@ def cmd_analyze(args):
     print("\n\n".join(results))
 
 
-def cmd_flags(args):
+def cmd_flags(args: Any) -> int:
     """List all flags from a slot file"""
     path = Path(args.file)
     data = load_data(path)
@@ -913,7 +914,7 @@ def cmd_flags(args):
         print(f"{i+1:>4} {f.get('name', '?'):<40} {t:>10} {t0:>10} {f.get('times',1):>4}")
 
 
-def cmd_emails(args):
+def cmd_emails(args: Any) -> int:
     """List emails from a slot file"""
     path = Path(args.file)
     data = load_data(path)
@@ -943,7 +944,7 @@ def cmd_emails(args):
                 print(f"      onRead: enum={eh.get('eventEnum')} data={eh.get('data','')[:80]}")
 
 
-def cmd_items(args):
+def cmd_items(args: Any) -> int:
     """List items from a slot file, resolving names via the ItemEnum table"""
     path = Path(args.file)
     data = load_json(path)
@@ -994,7 +995,7 @@ def cmd_items(args):
                   + (f"  {hexes}" if hexes else ""))
 
 
-def cmd_diff(args):
+def cmd_diff(args: Any) -> int:
     """Diff two slot files"""
     p1 = Path(args.file1)
     p2 = Path(args.file2)
@@ -1064,7 +1065,7 @@ def cmd_diff(args):
             )
 
 
-def cmd_story(args):
+def cmd_story(args: Any) -> int:
     """Analyze storyTextIds_Comp from save.mdrg"""
     path = Path(args.file)
     data = load_json(path)
@@ -1109,7 +1110,7 @@ def cmd_story(args):
     print("  Tracks which story text IDs have already been shown")
 
 
-def cmd_slots(args):
+def cmd_slots(args: Any) -> int:
     """List all save slots from a directory with progression"""
     directory = resolve_saves_dir(getattr(args, "directory", None))
     if not directory.is_dir():
@@ -1185,7 +1186,7 @@ def cmd_slots(args):
             )
 
 
-def cmd_dump(args):
+def cmd_dump(args: Any) -> int:
     """Pretty-print a file (with depth control)"""
     path = Path(args.file)
     data = load_data(path)
@@ -1217,7 +1218,7 @@ def cmd_dump(args):
         print(json.dumps(truncate(data, depth), indent=2, ensure_ascii=False))
 
 
-def cmd_extract(args):
+def cmd_extract(args: Any) -> int:
     """Extract a specific field from a file"""
     path = Path(args.file)
     data = load_json(path)
@@ -1246,7 +1247,7 @@ def cmd_extract(args):
         sys.exit(1)
 
 
-def cmd_playerprefs(args):
+def cmd_playerprefs(args: Any) -> int:
     """Parse PlayerPrefs.pp"""
     path = Path(args.file)
     data = load_json(path)
@@ -1280,7 +1281,7 @@ def backup_file(path):
     return bak
 
 
-def parse_value(s):
+def parse_value(s: str) -> Any:
     """Parse a string into the appropriate Python type"""
     if s.lower() == "true":
         return True
@@ -1301,7 +1302,7 @@ def parse_value(s):
     return s
 
 
-def parse_path(path_str):
+def parse_path(path_str: str) -> list:
     """Parse 'itemManager.items[0]._count' into [(type,key), ...]"""
     parts = []
     current = ""
@@ -1331,7 +1332,7 @@ def parse_path(path_str):
     return parts
 
 
-def format_path(parts):
+def format_path(parts: list) -> str:
     """Canonical breadcrumb for a parsed path, e.g. root.itemManager.items[0]
 
     The inverse of parse_path, and the exact shape the editor builds while you
@@ -1344,7 +1345,7 @@ def format_path(parts):
     )
 
 
-def set_path(data, path_str, value):
+def set_path(data: Any, path_str: str, value: Any) -> Any:
     """Set a value at the given path"""
     parts = parse_path(path_str)
     if not parts:
@@ -1356,7 +1357,7 @@ def set_path(data, path_str, value):
     current[pv] = value
 
 
-def format_value(v):
+def format_value(v: Any) -> str:
     """Format a value for display"""
     if v is None:
         return "null"
@@ -1400,7 +1401,7 @@ def _data_file(name):
     return None
 
 
-def load_item_names():
+def load_item_names() -> None:
     """Load id -> name from item_ids.txt (see _data_file for search order)"""
     if ITEM_NAMES:
         return ITEM_NAMES
@@ -1427,7 +1428,7 @@ def load_item_names():
     return ITEM_NAMES
 
 
-def mod_names(data):
+def mod_names(data: Any) -> dict:
     """Map mod GUID -> mod name, harvested from sets[].UsedMods[]"""
     out = {}
     for st in ((data or {}).get("itemManager") or {}).get("sets") or []:
@@ -1439,7 +1440,7 @@ def mod_names(data):
     return out
 
 
-def gameid_label(guid, gid, mods=None):
+def gameid_label(guid: str, gid: str, mods: dict = None) -> str:
     """Human label for a (_gameId._guid, _gameId._id) pair"""
     if guid:
         who = (mods or {}).get(guid) or f"mod {guid[:8]}"
@@ -1471,7 +1472,7 @@ def find_item_id(text):
 SLOT_DB = {}
 
 
-def load_slot_db():
+def load_slot_db() -> Any:
     """slot -> [(id, name)] from items_by_slot.json (optional)
 
     See _data_file for the search order
@@ -1520,7 +1521,7 @@ def new_item(gid, mod_guid="", count=1, quality=1.0, slot="", colors=1,
     return qkeyorder(rec)
 
 
-def item_summary(it, mods=None):
+def item_summary(it: Any, mods: dict = None) -> str:
     """One-line description of an item record"""
     gj = it.get("_gameId") or {}
     guid = ((gj.get("_guid") or {}).get("serializedGuid") or "").strip()
@@ -1538,7 +1539,7 @@ def item_summary(it, mods=None):
     return f"{label:<40} " + " ".join(bits)
 
 
-def iter_all_items(paths):
+def iter_all_items(paths: list) -> list:
     """Yield (path, index, item, data) for every item in the given files"""
     for p in paths:
         p = Path(p)
@@ -1550,7 +1551,7 @@ def iter_all_items(paths):
             yield p, i, it, data
 
 
-def find_guids(data):
+def find_guids(data: Any) -> list:
     """All item GUIDs in a save, plus duplicates"""
     seen, dups = Counter(), []
     for it in (data.get("itemManager") or {}).get("items") or []:
@@ -1562,7 +1563,7 @@ def find_guids(data):
     return seen, dups
 
 
-def is_color_dict(d):
+def is_color_dict(d: Any) -> bool:
     """True if d looks exactly like a colour entry {r,g,b[,a]} of numbers"""
     if not isinstance(d, dict) or not d:
         return False
@@ -1574,7 +1575,7 @@ def is_color_dict(d):
                for k in d)
 
 
-def to255(v):
+def to255(v: Any) -> int:
     """float 0..1 -> int 0..255 (for display)"""
     try:
         return max(0, min(255, int(round(float(v) * 255))))
@@ -1582,7 +1583,7 @@ def to255(v):
         return 0
 
 
-def from255(n):
+def from255(n: Any) -> int:
     """int 0..255 -> float 0..1 (for storage)"""
     return max(0.0, min(1.0, float(n) / 255.0))
 
@@ -1648,7 +1649,7 @@ def normalize_colors(data):
     return fixes
 
 
-def cmd_set(args):
+def cmd_set(args: Any) -> int:
     """Set a value at a given path (non-interactive)"""
     path = Path(args.file)
     data = load_data(path)
@@ -1680,7 +1681,7 @@ def cmd_set(args):
     print(f"Backup: {bak}")
 
 
-def item_context_lines(node, mods=None):
+def item_context_lines(node: Any, mods: dict = None) -> list:
     """Header lines describing an item record (label, count, swatches)"""
     if not isinstance(node, dict) or "_gameId" not in node:
         return []
@@ -1825,7 +1826,7 @@ def item_detail(v, mode):
     return " ".join(color_hex(c) for c in cols[:3])
 
 
-def item_preview(v, mods=None, detail="count"):
+def item_preview(v: Any, mods: dict = None, detail: str = "count") -> str:
     """Compact one-line preview of an item record, or "" if `v` is not one
 
     Name, then the value the detail cycler is set to - count, quality or colour
@@ -1872,7 +1873,7 @@ def edit_prefill(parent, key, value):
     return repr(value)
 
 
-def _human_size(n):
+def _human_size(n: int) -> str:
     """Compact file size for the picker: 812B / 24K / 1.2M"""
     if n < 1024:
         return f"{n}B"
@@ -1881,7 +1882,7 @@ def _human_size(n):
     return f"{n / (1024 * 1024):.1f}M"
 
 
-def _save_dir_candidates():
+def _save_dir_candidates() -> list:
     """Every directory the editor would consider, in priority order
 
     Mirrors resolve_saves_dir(): MDRG_SAVES_DIR wins outright, otherwise the
@@ -2056,7 +2057,7 @@ def _mouse_event():
     return None
 
 
-def _nudge(step, selected, total):
+def _nudge(step: int, selected: int, total: int) -> int:
     """The new selection after one wheel notch, clamped to the list
 
     One notch is one row, the same as an arrow key. Each caller keeps its own
@@ -2069,7 +2070,7 @@ def _nudge(step, selected, total):
     return selected
 
 
-def _grab_status(label, grab_from, grab_pos):
+def _grab_status(label: str, grab_from: int, grab_pos: int) -> str:
     """One-line description of a pending grab, for the status row"""
     off = grab_pos - grab_from
     where = "unmoved" if not off else f"{off:+d} row" + ("s" if abs(off) > 1 else "")
@@ -2133,7 +2134,7 @@ def _confirm_bak(stdscr, bak):
 _BACK_TO_LIST = object()
 
 
-def _pick_save(stdscr, state=None):
+def _pick_save(stdscr: Any, state: dict = None) -> Any:
     """Curses file picker. Shows the main save dir first; the last row scans
     every candidate folder. Returns a Path, or None if cancelled
 
@@ -2389,7 +2390,7 @@ def _pick_save(stdscr, state=None):
             return chosen
 
 
-def cmd_edit(args):
+def cmd_edit(args: Any) -> int:
     """Interactive TUI editor (curses). With no file, opens the file picker
 
     The list and the editor are two levels of one navigation model: backing
@@ -3304,7 +3305,7 @@ def _render_screen(st, stdscr, h, w, mods, path):
     return False
 
 
-def _interactive_edit(stdscr, data, path, save_root=None):
+def _interactive_edit(stdscr, data: Any, path: Path, save_root: Any = None) -> Any:
     """Curses-based interactive editor.
 
     Key dispatch:
@@ -3737,7 +3738,7 @@ def _interactive_edit(stdscr, data, path, save_root=None):
                 pass
 
 
-def select_items(data, selector):
+def select_items(data: Any, selector: str) -> list:
     """Resolve a selector to [(index, item), ...]
 
     Accepted forms:
@@ -3788,7 +3789,7 @@ def select_items(data, selector):
     return out
 
 
-def cmd_inventory(args):
+def cmd_inventory(args: Any) -> int:
     """Rich inventory listing with names, slots, colours and filtering"""
     load_item_names()
     paths = collect_files(args.files)
@@ -3839,7 +3840,7 @@ def cmd_inventory(args):
         print(f"total items matched: {total}")
 
 
-def cmd_slotsdb(args):
+def cmd_slotsdb(args: Any) -> int:
     """Show which items can go in each slot (from items_by_slot.json)"""
     db = load_slot_db()
     if not db:
@@ -3854,7 +3855,7 @@ def cmd_slotsdb(args):
             print(f"  {i:>9}  {n}")
 
 
-def cmd_find(args):
+def cmd_find(args: Any) -> int:
     """Search saves for item names, keys, or values"""
     needle = args.text.lower()
     paths = collect_files(args.targets)
@@ -3877,7 +3878,7 @@ def cmd_find(args):
     print(f"\n{hits} match(es)")
 
 
-def cmd_color(args):
+def cmd_color(args: Any) -> int:
     """View or set an item's colours (0..255 in, float 0..1 out)"""
     path = Path(args.file)
     data = load_data(path)
@@ -3913,7 +3914,7 @@ def cmd_color(args):
         print(f"\nupdated {changed} channel(s)  (backup: {bak.name})")
 
 
-def cmd_additem(args):
+def cmd_additem(args: Any) -> int:
     """Add an item to a save's inventory"""
     path = Path(args.file)
     data = load_data(path)
@@ -3937,7 +3938,7 @@ def cmd_additem(args):
     print(f"Saved: {path}\nBackup: {bak}")
 
 
-def cmd_delitem(args):
+def cmd_delitem(args: Any) -> int:
     """Remove item(s) from a save's inventory"""
     path = Path(args.file)
     data = load_data(path)
@@ -3968,7 +3969,7 @@ def cmd_delitem(args):
     print(f"items[] is now {len(items)} records\nSaved: {path}\nBackup: {bak}")
 
 
-def cmd_dupe(args):
+def cmd_dupe(args: Any) -> int:
     """Duplicate item(s) N times (new GUIDs, independent copies)"""
     path = Path(args.file)
     data = load_data(path)
@@ -3991,7 +3992,7 @@ def cmd_dupe(args):
     print(f"items[] is now {len(items)} records\nSaved: {path}\nBackup: {bak}")
 
 
-def cmd_equip(args):
+def cmd_equip(args: Any) -> int:
     """Equip or unequip an item"""
     path = Path(args.file)
     data = load_data(path)
@@ -4035,7 +4036,7 @@ def cmd_equip(args):
     print(f"Saved: {path}\nBackup: {bak}")
 
 
-def cmd_validate(args):
+def cmd_validate(args: Any) -> int:
     """Sanity-check a save (colours, ids, guids, slots, counts)"""
     path = Path(args.file)
     data = load_data(path)
@@ -4097,7 +4098,7 @@ def cmd_validate(args):
     return 1 if problems else 0
 
 
-def cmd_backups(args):
+def cmd_backups(args: Any) -> int:
     """List or restore .bak files"""
     path = Path(args.file)
     cands = sorted(path.parent.glob(path.name + "*.bak"))
@@ -4127,7 +4128,7 @@ def cmd_backups(args):
     print(f"previous state kept as {cur.name}")
 
 
-def cmd_tree(args):
+def cmd_tree(args: Any) -> int:
     """Dump a file with item names resolved and colours as hex"""
     path = Path(args.file)
     data = load_data(path)
@@ -4171,7 +4172,7 @@ def cmd_tree(args):
         print(text)
 
 
-def cmd_export(args):
+def cmd_export(args: Any) -> int:
     """Export a save to a normalised JSON with item names resolved"""
     path = Path(args.file)
     data = load_data(path)
