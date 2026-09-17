@@ -2718,6 +2718,315 @@ def _handle_quit(key, st, recall_filter):
     return None
 
 
+def _handle_prompts(key, st, remember_filter, parse_item_filter,
+                    parse_path, goto_path, recall_filter):
+    """Handle filter/jump/rename prompt input. Returns True if prompt still active.
+
+    `st` keys: filter_prompt, filter_buffer, jump_prompt, jump_buffer,
+    rename_prompt, rename_buffer, rename_target, filter_text, selected,
+    scroll, current, current_path_str, stack, status_msg, saved_flag.
+    Mutates st in place.
+    """
+    import curses
+    if key == 27:
+        st['filter_prompt'] = st['jump_prompt'] = st['rename_prompt'] = False
+        st['filter_buffer'] = st['jump_buffer'] = st['rename_buffer'] = ""
+        return False
+    elif key in (10, 13):
+        if st['filter_prompt']:
+            st['filter_text'] = st['filter_buffer']
+            remember_filter(st['current_path_str'], st['filter_text'])
+            st['selected'] = st['scroll'] = 0
+            if not st['filter_text']:
+                st['status_msg'] = "filter: (none)"
+            elif st['filter_text'].startswith("%"):
+                err = parse_item_filter(st['filter_text'])[1]
+                st['status_msg'] = (f"bad filter: {err}" if err
+                                    else f"filter: {st['filter_text']}")
+            else:
+                st['status_msg'] = f"filter: {st['filter_text']}"
+        elif st['jump_prompt']:
+            target = st['jump_buffer'].strip()
+            parts = parse_path(target)
+            if parts and parts[0] == ("dict", "root"):
+                parts = parts[1:]
+            keys = [part[1] for part in parts]
+            node, crumbs, done, rebuilt = goto_path(keys)
+            if done == len(keys):
+                st['stack'][:] = rebuilt
+                st['current'], st['current_path_str'] = node, crumbs
+                st['selected'] = st['scroll'] = 0
+                st['filter_text'] = recall_filter(st['current_path_str'])
+                st['status_msg'] = f"jumped to {st['current_path_str']}"
+            else:
+                st['status_msg'] = f"no such path: {target}"
+        else:
+            new_key = st['rename_buffer']
+            if st['rename_target'] and new_key and new_key != st['rename_target'][1]:
+                holder, old = st['rename_target']
+                st['saved_flag'] = True
+                if isinstance(holder, dict):
+                    rebuilt = {}
+                    for k, v in holder.items():
+                        rebuilt[new_key if k == old else k] = v
+                    holder.clear()
+                    holder.update(rebuilt)
+                else:
+                    holder.append(new_key)
+                    holder.pop(holder.index(old))
+                st['status_msg'] = f"renamed {old} -> {new_key}"
+        st['filter_prompt'] = st['jump_prompt'] = st['rename_prompt'] = False
+        st['filter_buffer'] = st['jump_buffer'] = st['rename_buffer'] = ""
+        st['rename_target'] = None
+        return False
+    elif key in (curses.KEY_BACKSPACE, 127, 8):
+        if st['filter_prompt']:
+            st['filter_buffer'] = st['filter_buffer'][:-1]
+        elif st['jump_prompt']:
+            st['jump_buffer'] = st['jump_buffer'][:-1]
+        else:
+            st['rename_buffer'] = st['rename_buffer'][:-1]
+    elif key >= 32 and key < 127:
+        if st['filter_prompt']:
+            st['filter_buffer'] += chr(key)
+        elif st['jump_prompt']:
+            st['jump_buffer'] += chr(key)
+        else:
+            st['rename_buffer'] += chr(key)
+    return True
+
+
+def _handle_special_keys(key, st, children, snapshot, edit_prefill,
+                            parse_value, uuid, recall_filter,
+                            DETAIL_MODES, is_color_dict, _COLOR_KEYS,
+                            to255, from255, stdscr, h, w, sys):
+    """Handle yank/paste/delete/clone/enter/color/hex/add-item keys.
+
+    `st` keys: yank_buf, status_msg, saved_flag, selected, scroll,
+    current, stack, current_path_str, filter_text, edit_mode,
+    edit_buffer, edit_key, edit_parent, edit_dirty, edit_target,
+    grab_from, grab_pos, grab_label, detail_mode, last_was_nudge,
+    rename_prompt, rename_buffer, rename_target.
+    Mutates st in place.
+    """
+    import curses
+    if key == ord("y"):
+        if st['selected'] < len(children):
+            name = children[st['selected']][0]
+            try:
+                val = st['current'][name] if isinstance(st['current'], dict) else st['current'][int(name[1:-1])]
+                st['yank_buf'][0] = json.loads(json.dumps(val))
+                st['status_msg'] = f"yanked {name}"
+            except Exception as e:
+                st['status_msg'] = f"yank failed: {e}"
+    elif key == ord("p"):
+        if st['yank_buf'][0] is None:
+            st['status_msg'] = "clipboard empty"
+        elif st['selected'] < len(children):
+            name = children[st['selected']][0]
+            try:
+                snapshot()
+                if isinstance(st['current'], dict):
+                    st['current'][name] = json.loads(json.dumps(st['yank_buf'][0]))
+                else:
+                    st['current'][int(name[1:-1])] = json.loads(json.dumps(st['yank_buf'][0]))
+                st['saved_flag'] = True
+                st['status_msg'] = f"pasted into {name}"
+            except Exception as e:
+                st['status_msg'] = f"paste failed: {e}"
+    elif key == ord("x"):
+        if st['selected'] < len(children):
+            name = children[st['selected']][0]
+            try:
+                snapshot()
+                if isinstance(st['current'], dict):
+                    del st['current'][name]
+                else:
+                    st['current'].pop(int(name[1:-1]))
+                st['saved_flag'] = True
+                st['selected'] = max(0, st['selected'] - 1)
+                st['status_msg'] = f"deleted {name}"
+            except Exception as e:
+                st['status_msg'] = f"delete failed: {e}"
+    elif key in (ord("v"), ord("V")):
+        nxt = (DETAIL_MODES.index(st['detail_mode']) + 1) % len(DETAIL_MODES)
+        st['detail_mode'] = DETAIL_MODES[nxt]
+        st['status_msg'] = f"detail: {st['detail_mode']}"
+    elif key in (ord("m"), ord("M")):
+        if st['filter_text']:
+            st['status_msg'] = "clear the filter before reordering"
+        elif not isinstance(st['current'], list) or not children:
+            st['status_msg'] = "reordering needs a list of entries"
+        else:
+            st['grab_from'] = st['grab_pos'] = st['selected']
+            st['grab_label'] = str(children[st['selected']][3])[:34]
+            st['status_msg'] = _grab_status(st['grab_label'], st['grab_from'], st['grab_pos'])
+    elif key == ord("r"):
+        if st['selected'] < len(children) and isinstance(st['current'], dict):
+            st['rename_prompt'] = True
+            st['rename_buffer'] = children[st['selected']][0]
+            st['rename_target'] = (st['current'], children[st['selected']][0])
+            st['status_msg'] = ""
+    elif key == ord("c"):
+        if st['selected'] < len(children):
+            name = children[st['selected']][0]
+            try:
+                snapshot()
+                if isinstance(st['current'], list):
+                    idx = int(name[1:-1])
+                    clone = json.loads(json.dumps(st['current'][idx]))
+                    if isinstance(clone, dict) and "_gameId" in clone:
+                        clone["UniqueItemGuid"] = {"serializedGuid": str(uuid.uuid4())}
+                        if isinstance(clone.get("_gameId"), dict):
+                            g = clone["_gameId"].setdefault("_guid", {})
+                            if not isinstance(g, dict):
+                                g = {}
+                                clone["_gameId"]["_guid"] = g
+                        clone["_equipedSlot"] = ""
+                    st['current'].insert(idx + 1, clone)
+                    st['saved_flag'] = True
+                    st['status_msg'] = f"cloned {name}"
+                elif isinstance(st['current'], dict):
+                    val = json.loads(json.dumps(st['current'][name]))
+                    k2 = f"{name} copy"
+                    n = 2
+                    while k2 in st['current']:
+                        k2 = f"{name} copy {n}"
+                        n += 1
+                    st['current'][k2] = val
+                    st['saved_flag'] = True
+                    st['status_msg'] = f"cloned {name} -> {k2}"
+            except Exception as e:
+                st['status_msg'] = f"clone failed: {e}"
+    elif key in (10, 13, curses.KEY_RIGHT, ord("d"), ord("D")):
+        if st['selected'] < len(children):
+            nm, icon, type_str, val_str, kind = children[st['selected']]
+            if kind == "container":
+                if isinstance(st['current'], dict):
+                    child = st['current'][nm]
+                else:
+                    idx = int(nm[1:-1])
+                    child = st['current'][idx]
+                st['stack'].append((st['current'], nm, child, st['current_path_str'], st['selected']))
+                if isinstance(st['current'], dict):
+                    st['current_path_str'] = f"{st['current_path_str']}.{nm}"
+                else:
+                    st['current_path_str'] = f"{st['current_path_str']}{nm}"
+                st['current'] = child
+                st['selected'] = 0
+                st['scroll'] = 0
+                st['filter_text'] = recall_filter(st['current_path_str'])
+                if st['filter_text']:
+                    st['status_msg'] = f"/{st['filter_text']} restored"
+            elif kind == "scalar":
+                if isinstance(st['current'], dict):
+                    st['edit_parent'] = st['current']
+                    st['edit_key'] = nm
+                else:
+                    idx = int(nm[1:-1])
+                    st['edit_parent'] = st['current']
+                    st['edit_key'] = str(idx)
+                st['edit_buffer'] = edit_prefill(st['edit_parent'], st['edit_key'])
+                st['edit_mode'] = True
+                st['edit_dirty'] = False
+    elif key == ord("e") or key == ord("E"):
+        if st['selected'] < len(children):
+            nm, icon, type_str, val_str, kind = children[st['selected']]
+            if kind == "scalar":
+                if isinstance(st['current'], dict):
+                    st['edit_parent'] = st['current']
+                    st['edit_key'] = nm
+                else:
+                    idx = int(nm[1:-1])
+                    st['edit_parent'] = st['current']
+                    st['edit_key'] = str(idx)
+                st['edit_mode'] = True
+                st['edit_target'] = (
+                    st['current'][nm] if isinstance(st['current'], dict)
+                    else st['current'][idx]
+                )
+                st['edit_buffer'] = edit_prefill(st['edit_parent'], st['edit_key'], st['edit_target'])
+                st['edit_dirty'] = False
+    elif (
+        key in (ord("+"), ord("="), ord("-"), ord("["), ord("]"))
+        and is_color_dict(st['current'])
+        and st['selected'] < len(children)
+    ):
+        nm = children[st['selected']][0]
+        if nm in _COLOR_KEYS:
+            step = 8 if key in (ord("["), ord("]")) else 1
+            if key in (ord("-"), ord("[")):
+                step = -step
+            cur = st['current'][nm]
+            newv = from255(max(0, min(255, to255(cur) + step)))
+            if not st['last_was_nudge']:
+                snapshot()
+            st['current'][nm] = newv
+            st['saved_flag'] = True
+            st['last_was_nudge'] = True
+    elif key in (ord("h"), ord("H")) and is_color_dict(st['current']):
+        try:
+            stdscr.addstr(h - 2, 0, " Hex (RRGGBB): "[: w - 1], curses.color_pair(5))
+            stdscr.refresh()
+            curses.echo()
+            txt = stdscr.getstr(h - 2, 15, 10).decode("utf-8", errors="replace").strip()
+            curses.noecho()
+            txt = txt.lstrip("#")
+            if len(txt) == 6:
+                snapshot()
+                st['current']["r"] = from255(int(txt[0:2], 16))
+                st['current']["g"] = from255(int(txt[2:4], 16))
+                st['current']["b"] = from255(int(txt[4:6], 16))
+                st['saved_flag'] = True
+        except Exception:
+            try:
+                curses.noecho()
+            except Exception:
+                pass
+    elif key == ord("n") or key == ord("N"):
+        if isinstance(st['current'], dict):
+            try:
+                stdscr.addstr(h - 2, 0, " New key: "[: w - 1], curses.color_pair(5))
+                stdscr.refresh()
+                curses.echo()
+                new_key = stdscr.getstr(h - 2, 11, w - 12).decode("utf-8", errors="replace")
+                curses.noecho()
+                if new_key:
+                    stdscr.addstr(h - 2, 0, " New value: "[: w - 1], curses.color_pair(5))
+                    stdscr.refresh()
+                    curses.echo()
+                    new_val_str = stdscr.getstr(
+                        h - 2, 13, w - 14
+                    ).decode("utf-8", errors="replace")
+                    curses.noecho()
+                    snapshot()
+                    st['current'][new_key] = parse_value(new_val_str)
+                    st['saved_flag'] = True
+            except Exception as e:
+                try:
+                    stdscr.addstr(h - 1, 0, f" Error: {e}"[: w - 1], curses.color_pair(4))
+                    stdscr.refresh()
+                    curses.napms(1000)
+                except Exception as e2:
+                    print(f"Error: {e2}", file=sys.stderr)
+        elif isinstance(st['current'], list):
+            try:
+                stdscr.addstr(h - 2, 0, " New value: "[: w - 1], curses.color_pair(5))
+                stdscr.refresh()
+                curses.echo()
+                new_val_str = stdscr.getstr(h - 2, 13, w - 14).decode("utf-8", errors="replace")
+                curses.noecho()
+                st['current'].append(parse_value(new_val_str))
+                st['saved_flag'] = True
+            except Exception as e:
+                try:
+                    stdscr.addstr(h - 1, 0, f" Error: {e}"[: w - 1], curses.color_pair(4))
+                    stdscr.refresh()
+                    curses.napms(1000)
+                except Exception as e2:
+                    print(f"Error: {e2}", file=sys.stderr)
+
+
 def _interactive_edit(stdscr, data, path, save_root=None):
     """Curses-based interactive editor.
 
@@ -3197,71 +3506,35 @@ def _interactive_edit(stdscr, data, path, save_root=None):
 
         # prompt modes (filter / jump / rename)
         if filter_prompt or jump_prompt or rename_prompt:
-            if key == 27:
-                filter_prompt = jump_prompt = rename_prompt = False
-                filter_buffer = jump_buffer = rename_buffer = ""
-            elif key in (10, 13):
-                if filter_prompt:
-                    filter_text = filter_buffer
-                    remember_filter(current_path_str, filter_text)
-                    selected = scroll = 0
-                    if not filter_text:
-                        status_msg = "filter: (none)"
-                    elif filter_text.startswith("%"):
-                        err = parse_item_filter(filter_text)[1]
-                        status_msg = (f"bad filter: {err}" if err
-                                      else f"filter: {filter_text}")
-                    else:
-                        status_msg = f"filter: {filter_text}"
-                elif jump_prompt:
-                    target = jump_buffer.strip()
-                    parts = parse_path(target)
-                    if parts and parts[0] == ("dict", "root"):
-                        parts = parts[1:]
-                    keys = [part[1] for part in parts]
-                    node, crumbs, done, rebuilt = goto_path(keys)
-                    if done == len(keys):
-                        stack[:] = rebuilt
-                        current, current_path_str = node, crumbs
-                        selected = scroll = 0
-                        filter_text = recall_filter(current_path_str)
-                        status_msg = f"jumped to {current_path_str}"
-                    else:
-                        status_msg = f"no such path: {target}"
-                else:
-                    new_key = rename_buffer
-                    if rename_target and new_key and new_key != rename_target[1]:
-                        holder, old = rename_target
-                        snapshot()
-                        if isinstance(holder, dict):
-                            rebuilt = {}
-                            for k, v in holder.items():
-                                rebuilt[new_key if k == old else k] = v
-                            holder.clear()
-                            holder.update(rebuilt)
-                        else:
-                            holder.append(new_key)
-                            holder.pop(holder.index(old))
-                        saved_flag = True
-                        status_msg = f"renamed {old} -> {new_key}"
-                filter_prompt = jump_prompt = rename_prompt = False
-                filter_buffer = jump_buffer = rename_buffer = ""
-                rename_target = None
-            elif key in (curses.KEY_BACKSPACE, 127, 8):
-                if filter_prompt:
-                    filter_buffer = filter_buffer[:-1]
-                elif jump_prompt:
-                    jump_buffer = jump_buffer[:-1]
-                else:
-                    rename_buffer = rename_buffer[:-1]
-            elif key >= 32 and key < 127:
-                if filter_prompt:
-                    filter_buffer += chr(key)
-                elif jump_prompt:
-                    jump_buffer += chr(key)
-                else:
-                    rename_buffer += chr(key)
-            continue
+            st = {
+                'filter_prompt': filter_prompt, 'filter_buffer': filter_buffer,
+                'jump_prompt': jump_prompt, 'jump_buffer': jump_buffer,
+                'rename_prompt': rename_prompt, 'rename_buffer': rename_buffer,
+                'rename_target': rename_target, 'filter_text': filter_text,
+                'selected': selected, 'scroll': scroll,
+                'current': current, 'current_path_str': current_path_str,
+                'stack': stack, 'status_msg': status_msg,
+                'saved_flag': saved_flag,
+            }
+            still = _handle_prompts(
+                key, st, remember_filter, parse_item_filter,
+                parse_path, goto_path, recall_filter)
+            filter_prompt = st['filter_prompt']
+            filter_buffer = st['filter_buffer']
+            jump_prompt = st['jump_prompt']
+            jump_buffer = st['jump_buffer']
+            rename_prompt = st['rename_prompt']
+            rename_buffer = st['rename_buffer']
+            rename_target = st['rename_target']
+            filter_text = st['filter_text']
+            selected = st['selected']
+            scroll = st['scroll']
+            current = st['current']
+            current_path_str = st['current_path_str']
+            status_msg = st['status_msg']
+            saved_flag = st['saved_flag']
+            if not still:
+                continue
 
         if grab_from is not None:
             grab_from, grab_pos, selected, scroll, saved_flag, \
@@ -3297,228 +3570,48 @@ def _interactive_edit(stdscr, data, path, save_root=None):
             else:
                 status_msg = "nothing to redo"
         elif key == ord("y"):  # yank
-            if selected < len(children):
-                name = children[selected][0]
-                try:
-                    val = current[name] if isinstance(current, dict) else current[int(name[1:-1])]
-                    yank_buf[0] = json.loads(json.dumps(val))
-                    status_msg = f"yanked {name}"
-                except Exception as e:
-                    status_msg = f"yank failed: {e}"
-        elif key == ord("p"):  # paste
-            if yank_buf[0] is None:
-                status_msg = "clipboard empty"
-            elif selected < len(children):
-                name = children[selected][0]
-                try:
-                    snapshot()
-                    if isinstance(current, dict):
-                        current[name] = json.loads(json.dumps(yank_buf[0]))
-                    else:
-                        current[int(name[1:-1])] = json.loads(json.dumps(yank_buf[0]))
-                    saved_flag = True
-                    status_msg = f"pasted into {name}"
-                except Exception as e:
-                    status_msg = f"paste failed: {e}"
-        elif key == ord("x"):  # delete
-            if selected < len(children):
-                name = children[selected][0]
-                try:
-                    snapshot()
-                    if isinstance(current, dict):
-                        del current[name]
-                    else:
-                        current.pop(int(name[1:-1]))
-                    saved_flag = True
-                    selected = max(0, selected - 1)
-                    status_msg = f"deleted {name}"
-                except Exception as e:
-                    status_msg = f"delete failed: {e}"
-        elif key in (ord("v"), ord("V")):  # cycle the item value column
-            nxt = (DETAIL_MODES.index(detail_mode) + 1) % len(DETAIL_MODES)
-            detail_mode = DETAIL_MODES[nxt]
-            status_msg = f"detail: {detail_mode}"
-        elif key in (ord("m"), ord("M")):  # grab an entry to reorder it
-            if filter_text:
-                status_msg = "clear the filter before reordering"
-            elif not isinstance(current, list) or not children:
-                status_msg = "reordering needs a list of entries"
-            else:
-                grab_from = grab_pos = selected
-                grab_label = str(children[selected][3])[:34]
-                status_msg = _grab_status(grab_label, grab_from, grab_pos)
-        elif key == ord("r"):  # rename
-            if selected < len(children) and isinstance(current, dict):
-                rename_prompt = True
-                rename_buffer = children[selected][0]
-                rename_target = (current, children[selected][0])
-                status_msg = ""
-        elif key == ord("c"):  # clone
-            if selected < len(children):
-                name = children[selected][0]
-                try:
-                    snapshot()
-                    if isinstance(current, list):
-                        idx = int(name[1:-1])
-                        clone = json.loads(json.dumps(current[idx]))
-                        if isinstance(clone, dict) and "_gameId" in clone:
-                            clone["UniqueItemGuid"] = {"serializedGuid": str(uuid.uuid4())}
-                            if isinstance(clone.get("_gameId"), dict):
-                                g = clone["_gameId"].setdefault("_guid", {})
-                                if not isinstance(g, dict):
-                                    g = {}
-                                    clone["_gameId"]["_guid"] = g
-                            clone["_equipedSlot"] = ""
-                        current.insert(idx + 1, clone)
-                        saved_flag = True
-                        status_msg = f"cloned {name}"
-                    elif isinstance(current, dict):
-                        val = json.loads(json.dumps(current[name]))
-                        k2 = f"{name} copy"
-                        n = 2
-                        while k2 in current:
-                            k2 = f"{name} copy {n}"
-                            n += 1
-                        current[k2] = val
-                        saved_flag = True
-                        status_msg = f"cloned {name} -> {k2}"
-                except Exception as e:
-                    status_msg = f"clone failed: {e}"
-        elif key in (10, 13, curses.KEY_RIGHT, ord("d"), ord("D")):  # Enter
-            if selected < len(children):
-                name, icon, type_str, val_str, kind = children[selected]
-                if kind == "container":
-                    if isinstance(current, dict):
-                        child = current[name]
-                    else:
-                        idx = int(name[1:-1])
-                        child = current[idx]
-                    stack.append((current, name, child, current_path_str, selected))
-                    if isinstance(current, dict):
-                        current_path_str = f"{current_path_str}.{name}"
-                    else:
-                        current_path_str = f"{current_path_str}{name}"
-                    current = child
-                    selected = 0
-                    scroll = 0
-                    filter_text = recall_filter(current_path_str)
-                    if filter_text:
-                        status_msg = f"/{filter_text} restored"
-                elif kind == "scalar":
-                    if isinstance(current, dict):
-                        edit_parent = current
-                        edit_key = name
-                    else:
-                        idx = int(name[1:-1])
-                        edit_parent = current
-                        edit_key = str(idx)
-                    edit_buffer = edit_prefill(
-                        edit_parent, edit_key
-                    )
-                    edit_mode = True
-                    edit_dirty = False
-        elif key == ord("e") or key == ord("E"):
-            if selected < len(children):
-                name, icon, type_str, val_str, kind = children[selected]
-                if kind == "scalar":
-                    if isinstance(current, dict):
-                        edit_parent = current
-                        edit_key = name
-                    else:
-                        idx = int(name[1:-1])
-                        edit_parent = current
-                        edit_key = str(idx)
-                    edit_mode = True
-                    edit_target = (
-                        current[name] if isinstance(current, dict)
-                        else current[idx]
-                    )
-                    edit_buffer = edit_prefill(
-                        edit_parent, edit_key, edit_target
-                    )
-                    edit_dirty = False
-        elif (
-            key in (ord("+"), ord("="), ord("-"), ord("["), ord("]"))
-            and is_color_dict(current)
-            and selected < len(children)
-        ):
-            # color adjuster: nudge the selected channel without typing.
-            name = children[selected][0]
-            if name in _COLOR_KEYS:
-                step = 8 if key in (ord("["), ord("]")) else 1
-                if key in (ord("-"), ord("[")):
-                    step = -step
-                cur = current[name]
-                newv = from255(max(0, min(255, to255(cur) + step)))
-                if not last_was_nudge:
-                    snapshot()
-                current[name] = newv
-                saved_flag = True
-                last_was_nudge = True
-        elif key in (ord("h"), ord("H")) and is_color_dict(current):
-            # hex entry #rrggbb applied to r,g,b
-            try:
-                stdscr.addstr(h - 2, 0, " Hex (RRGGBB): "[: w - 1], curses.color_pair(5))
-                stdscr.refresh()
-                curses.echo()
-                txt = stdscr.getstr(h - 2, 15, 10).decode("utf-8", errors="replace").strip()
-                curses.noecho()
-                txt = txt.lstrip("#")
-                if len(txt) == 6:
-                    snapshot()
-                    current["r"] = from255(int(txt[0:2], 16))
-                    current["g"] = from255(int(txt[2:4], 16))
-                    current["b"] = from255(int(txt[4:6], 16))
-                    saved_flag = True
-            except Exception:
-                try:
-                    curses.noecho()
-                except Exception:
-                    pass
-        elif key == ord("n") or key == ord("N"):
-            # add item
-            if isinstance(current, dict):
-                # prompt for key
-                try:
-                    stdscr.addstr(h - 2, 0, " New key: "[: w - 1], curses.color_pair(5))
-                    stdscr.refresh()
-                    curses.echo()
-                    new_key = stdscr.getstr(h - 2, 11, w - 12).decode("utf-8", errors="replace")
-                    curses.noecho()
-                    if new_key:
-                        stdscr.addstr(h - 2, 0, " New value: "[: w - 1], curses.color_pair(5))
-                        stdscr.refresh()
-                        curses.echo()
-                        new_val_str = stdscr.getstr(
-                            h - 2, 13, w - 14
-                        ).decode("utf-8", errors="replace")
-                        curses.noecho()
-                        snapshot()
-                        current[new_key] = parse_value(new_val_str)
-                        saved_flag = True
-                except Exception as e:
-                    try:
-                        stdscr.addstr(h - 1, 0, f" Error: {e}"[: w - 1], curses.color_pair(4))
-                        stdscr.refresh()
-                        curses.napms(1000)
-                    except Exception as e2:
-                        print(f"Error: {e2}", file=sys.stderr)
-            elif isinstance(current, list):
-                try:
-                    stdscr.addstr(h - 2, 0, " New value: "[: w - 1], curses.color_pair(5))
-                    stdscr.refresh()
-                    curses.echo()
-                    new_val_str = stdscr.getstr(h - 2, 13, w - 14).decode("utf-8", errors="replace")
-                    curses.noecho()
-                    current.append(parse_value(new_val_str))
-                    saved_flag = True
-                except Exception as e:
-                    try:
-                        stdscr.addstr(h - 1, 0, f" Error: {e}"[: w - 1], curses.color_pair(4))
-                        stdscr.refresh()
-                        curses.napms(1000)
-                    except Exception as e2:
-                        print(f"Error: {e2}", file=sys.stderr)
+            sk_st = {
+                'yank_buf': yank_buf, 'status_msg': status_msg,
+                'saved_flag': saved_flag, 'selected': selected,
+                'scroll': scroll, 'current': current,
+                'stack': stack, 'current_path_str': current_path_str,
+                'filter_text': filter_text, 'edit_mode': edit_mode,
+                'edit_buffer': edit_buffer, 'edit_key': edit_key,
+                'edit_parent': edit_parent, 'edit_dirty': edit_dirty,
+                'edit_target': edit_target, 'grab_from': grab_from,
+                'grab_pos': grab_pos, 'grab_label': grab_label,
+                'detail_mode': detail_mode, 'last_was_nudge': last_was_nudge,
+                'rename_prompt': rename_prompt, 'rename_buffer': rename_buffer,
+                'rename_target': rename_target,
+            }
+            _handle_special_keys(
+                key, sk_st, children, snapshot, edit_prefill,
+                parse_value, uuid, recall_filter, DETAIL_MODES,
+                is_color_dict, _COLOR_KEYS, to255, from255,
+                stdscr, h, w, sys)
+            yank_buf = sk_st['yank_buf']
+            status_msg = sk_st['status_msg']
+            saved_flag = sk_st['saved_flag']
+            selected = sk_st['selected']
+            scroll = sk_st['scroll']
+            current = sk_st['current']
+            stack = sk_st['stack']
+            current_path_str = sk_st['current_path_str']
+            filter_text = sk_st['filter_text']
+            edit_mode = sk_st['edit_mode']
+            edit_buffer = sk_st['edit_buffer']
+            edit_key = sk_st['edit_key']
+            edit_parent = sk_st['edit_parent']
+            edit_dirty = sk_st['edit_dirty']
+            edit_target = sk_st['edit_target']
+            grab_from = sk_st['grab_from']
+            grab_pos = sk_st['grab_pos']
+            grab_label = sk_st['grab_label']
+            detail_mode = sk_st['detail_mode']
+            last_was_nudge = sk_st['last_was_nudge']
+            rename_prompt = sk_st['rename_prompt']
+            rename_buffer = sk_st['rename_buffer']
+            rename_target = sk_st['rename_target']
         elif key in (ord("o"), ord("O"), 19):  # 19 = Ctrl+S
             if _handle_save_keypress(key, path, save_root, stdscr, h, w):
                 saved_flag = False
