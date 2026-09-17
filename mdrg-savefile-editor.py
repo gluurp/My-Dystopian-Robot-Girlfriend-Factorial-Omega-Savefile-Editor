@@ -3544,11 +3544,6 @@ def _interactive_edit(stdscr, data, path, save_root=None):
             continue
         if key not in (ord("+"), ord("="), ord("-"), ord("["), ord("]")):
             last_was_nudge = False
-        key = stdscr.getch()
-        if key == curses.KEY_RESIZE:
-            continue
-        if key not in (ord("+"), ord("="), ord("-"), ord("["), ord("]")):
-            last_was_nudge = False
 
         if edit_mode:
             edit_mode, edit_buffer, edit_key, edit_parent, edit_dirty, \
