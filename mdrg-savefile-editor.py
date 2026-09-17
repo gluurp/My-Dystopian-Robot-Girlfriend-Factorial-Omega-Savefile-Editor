@@ -2632,6 +2632,92 @@ def _handle_movement(key, selected, scroll, visible, children):
     return selected, scroll, key
 
 
+def _handle_quit(key, st, recall_filter):
+    """Handle a/left, q/Q, ESC. Returns action string or None.
+
+    `st` is a dict with: edit_mode, edit_buffer, edit_key, edit_parent,
+    edit_dirty, saved_flag, quit_confirm, status_msg, filter_text,
+    stack, current, current_path_str, selected, scroll.
+    Mutates st in place.
+
+    Actions: 'back' (a/left went up), 'quit' (q exits),
+    'confirm' (q asks again), 'cancel_edit' (ESC in edit),
+    'clear_filter' (ESC clears filter), 'back_one' (ESC up one level),
+    'root_msg' (ESC at root)
+    """
+    if key in (ord("a"), curses.KEY_LEFT):
+        if st['edit_mode']:
+            st['edit_mode'] = False
+            st['edit_buffer'] = ""
+            st['edit_key'] = ""
+            st['edit_parent'] = None
+            st['edit_dirty'] = False
+        elif st['stack']:
+            parent, k, child, path_str, sel = st['stack'].pop()
+            st['current'] = parent
+            st['current_path_str'] = path_str
+            st['selected'] = sel
+            st['scroll'] = max(0, sel - 3)
+            remembered = recall_filter(path_str)
+            st['filter_text'] = remembered
+            if remembered:
+                st['status_msg'] = f"/{remembered} restored"
+            return "back"
+        elif st['saved_flag'] and not st['quit_confirm']:
+            st['quit_confirm'] = True
+            st['status_msg'] = ("UNSAVED CHANGES - back again to leave anyway, "
+                                "o to save")
+            return "confirm"
+        else:
+            return "quit"
+
+    elif key in (ord("q"), ord("Q")):
+        if st['edit_mode']:
+            st['edit_mode'] = False
+            st['edit_buffer'] = ""
+            st['edit_key'] = ""
+            st['edit_parent'] = None
+            st['edit_dirty'] = False
+            st['status_msg'] = "edit cancelled"
+            return "cancel_edit"
+        elif st['saved_flag'] and not st['quit_confirm']:
+            st['quit_confirm'] = True
+            st['status_msg'] = "UNSAVED CHANGES - press q again to discard, or o to save"
+            return "confirm"
+        else:
+            return "quit"
+
+    elif key == 27:
+        if st['edit_mode']:
+            st['edit_mode'] = False
+            st['edit_buffer'] = ""
+            st['edit_key'] = ""
+            st['edit_parent'] = None
+            st['edit_dirty'] = False
+            return "cancel_edit"
+        elif st.get('filter_text'):
+            st['filter_text'] = ""
+            st['selected'] = 0
+            st['scroll'] = 0
+            st['status_msg'] = "filter cleared"
+            return "clear_filter"
+        elif st['stack']:
+            parent, k, child, path_str, sel = st['stack'].pop()
+            st['current'] = parent
+            st['current_path_str'] = path_str
+            st['selected'] = sel
+            st['scroll'] = max(0, sel - 3)
+            remembered = recall_filter(path_str)
+            if remembered:
+                st['status_msg'] = f"/{remembered} restored"
+            return "back_one"
+        else:
+            st['status_msg'] = "at root - 'a' or left arrow goes back, q quits"
+            return "root_msg"
+
+    return None
+
+
 def _interactive_edit(stdscr, data, path, save_root=None):
     """Curses-based interactive editor.
 
@@ -3437,65 +3523,75 @@ def _interactive_edit(stdscr, data, path, save_root=None):
             if _handle_save_keypress(key, path, save_root, stdscr, h, w):
                 saved_flag = False
                 quit_confirm = False
-        elif key in (curses.KEY_LEFT, ord("a")):
-            if edit_mode:
-                edit_mode = False
-                edit_buffer = ""
-                edit_key = ""
-                edit_parent = None
-                edit_dirty = False
-            elif stack:
-                parent, key, child, path_str, sel = stack.pop()
-                current = parent
-                current_path_str = path_str
-                selected = sel
-                scroll = max(0, selected - 3)
-                filter_text = recall_filter(path_str)
-                if filter_text:
-                    status_msg = f"/{filter_text} restored"
-            elif saved_flag and not quit_confirm:
-                quit_confirm = True
-                status_msg = ("UNSAVED CHANGES - back again to leave anyway, "
-                              "o to save")
-            else:
+        elif key in (ord("a"), curses.KEY_LEFT):
+            st = {
+                'edit_mode': edit_mode, 'edit_buffer': edit_buffer,
+                'edit_key': edit_key, 'edit_parent': edit_parent,
+                'edit_dirty': edit_dirty, 'saved_flag': saved_flag,
+                'quit_confirm': quit_confirm, 'status_msg': status_msg,
+                'filter_text': filter_text, 'stack': stack,
+                'current': current, 'current_path_str': current_path_str,
+                'selected': selected, 'scroll': scroll,
+            }
+            action = _handle_quit(key, st, recall_filter)
+            edit_mode = st['edit_mode']
+            edit_buffer = st['edit_buffer']
+            edit_key = st['edit_key']
+            edit_parent = st['edit_parent']
+            edit_dirty = st['edit_dirty']
+            saved_flag = st['saved_flag']
+            quit_confirm = st['quit_confirm']
+            status_msg = st['status_msg']
+            filter_text = st['filter_text']
+            current = st['current']
+            current_path_str = st['current_path_str']
+            selected = st['selected']
+            scroll = st['scroll']
+            if action == "quit":
                 return _BACK_TO_LIST
         elif key in (ord("q"), ord("Q")):
-            if edit_mode:
-                edit_mode = False
-                edit_buffer = ""
-                edit_key = ""
-                edit_parent = None
-                edit_dirty = False
-                status_msg = "edit cancelled"
-            elif saved_flag and not quit_confirm:
-                # don't lose edits by accident
-                quit_confirm = True
-                status_msg = "UNSAVED CHANGES - press q again to discard, or o to save"
-            else:
+            st = {
+                'edit_mode': edit_mode, 'edit_buffer': edit_buffer,
+                'edit_key': edit_key, 'edit_parent': edit_parent,
+                'edit_dirty': edit_dirty, 'saved_flag': saved_flag,
+                'quit_confirm': quit_confirm, 'status_msg': status_msg,
+                'filter_text': filter_text, 'stack': stack,
+                'current': current, 'current_path_str': current_path_str,
+                'selected': selected, 'scroll': scroll,
+            }
+            action = _handle_quit(key, st, recall_filter)
+            edit_mode = st['edit_mode']
+            edit_buffer = st['edit_buffer']
+            edit_key = st['edit_key']
+            edit_parent = st['edit_parent']
+            edit_dirty = st['edit_dirty']
+            saved_flag = st['saved_flag']
+            quit_confirm = st['quit_confirm']
+            status_msg = st['status_msg']
+            if action == "quit":
                 break
         elif key == 27:
-            if edit_mode:
-                edit_mode = False
-                edit_buffer = ""
-                edit_key = ""
-                edit_parent = None
-                edit_dirty = False
-            elif filter_text:
-                remember_filter(current_path_str, "")
-                filter_text = ""
-                selected = scroll = 0
-                status_msg = "filter cleared"
-            elif stack:
-                parent, key, child, path_str, sel = stack.pop()
-                current = parent
-                current_path_str = path_str
-                selected = sel
-                scroll = max(0, selected - 3)
-                filter_text = recall_filter(path_str)
-                if filter_text:
-                    status_msg = f"/{filter_text} restored"
-            else:
-                status_msg = "at root - 'a' or left arrow goes back, q quits"
+            st = {
+                'edit_mode': edit_mode, 'edit_buffer': edit_buffer,
+                'edit_key': edit_key, 'edit_parent': edit_parent,
+                'edit_dirty': edit_dirty, 'saved_flag': saved_flag,
+                'quit_confirm': quit_confirm, 'status_msg': status_msg,
+                'filter_text': filter_text, 'stack': stack,
+                'current': current, 'current_path_str': current_path_str,
+                'selected': selected, 'scroll': scroll,
+            }
+            action = _handle_quit(key, st, recall_filter)
+            edit_mode = st['edit_mode']
+            edit_buffer = st['edit_buffer']
+            edit_key = st['edit_key']
+            edit_parent = st['edit_parent']
+            edit_dirty = st['edit_dirty']
+            filter_text = st['filter_text']
+            selected = st['selected']
+            scroll = st['scroll']
+            status_msg = st['status_msg']
+            if action in ("cancel_edit", "clear_filter", "back_one", "root_msg"):
+                pass
 
 
 def select_items(data, selector):
