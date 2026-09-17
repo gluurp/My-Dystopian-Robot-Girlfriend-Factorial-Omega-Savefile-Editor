@@ -474,6 +474,8 @@ def cmd_where(args):
 SECONDS_PER_DAY = 86400
 SECONDS_PER_HOUR = 3600
 SECONDS_PER_MINUTE = 60
+MILLIS_PER_HOUR = 3_600_000
+MILLIS_PER_MINUTE = 60_000
 
 
 def _is_likely_json(path):
@@ -1141,7 +1143,7 @@ def cmd_slots(args):
         print(H_LINE * 75)
         for d in auto_slots:
             row = (
-                f"{(d.get('botName','')+'-'+str(d.get('time','')))[:19]:<20} "
+                f"{(d.get('botName','')+'-'+str(d.get('time','')))[:20]:<20} "
                 f"{d.get('time',''):>8} {d.get('stage','') or '':>5} "
                 f"{num(d.get('money')):>12,} {num(d.get('subs')):>5} "
                 f"{num(d.get('followers')):>5} {len(d.get('flags',[])):>5} "
@@ -1160,7 +1162,7 @@ def cmd_slots(args):
         print(H_LINE * 75)
         for d in manual_slots:
             row = (
-                f"{(d.get('botName','')+'-'+str(d.get('time','')))[:19]:<20} "
+                f"{(d.get('botName','')+'-'+str(d.get('time','')))[:20]:<20} "
                 f"{d.get('time',''):>8} {d.get('stage','') or '':>5} "
                 f"{num(d.get('money')):>12,} {num(d.get('subs')):>5} "
                 f"{num(d.get('followers')):>5} {len(d.get('flags',[])):>5} "
@@ -1249,18 +1251,22 @@ def cmd_playerprefs(args):
     print(f"=== PlayerPrefs: {path.name} ===")
     for e in data.get("data", []):
         val = e.get("Value", "")
-        if val.isdigit():
+        try:
             ival = int(val)
-            if e["Key"] == "millisSpentPlaying":
-                hrs = ival / 3600000
-                mins = ival / 60000
-                print(f"  {e['Key']}: {ival:,} ms  ({hrs:.1f} hours, {mins:.0f} minutes)")
-            elif e["Key"] in ("lastLoadingSucceded", "shownModsDanger", "cumFlashbangEnabled"):
-                print(f"  {e['Key']}: {bool(ival)}")
-            else:
-                print(f"  {e['Key']}: {ival}")
+        except ValueError:
+            try:
+                ival = float(val)
+            except ValueError:
+                print(f"  {e['Key']}: {val}")
+                continue
+        if e["Key"] == "millisSpentPlaying":
+            hrs = ival / MILLIS_PER_HOUR
+            mins = ival / MILLIS_PER_MINUTE
+            print(f"  {e['Key']}: {ival:,} ms  ({hrs:.1f} hours, {mins:.0f} minutes)")
+        elif e["Key"] in ("lastLoadingSucceded", "shownModsDanger", "cumFlashbangEnabled"):
+            print(f"  {e['Key']}: {bool(ival)}")
         else:
-            print(f"  {e['Key']}: {val}")
+            print(f"  {e['Key']}: {ival}")
 
 
 
@@ -1304,10 +1310,11 @@ def parse_path(path_str):
             if current:
                 parts.append(("dict", current))
                 current = ""
+            else:
+                raise ValueError(f"Empty key at position {i}")
         elif ch == "[":
-            if current:
-                parts.append(("dict", current))
-                current = ""
+            if not current:
+                raise ValueError(f"Empty key before '[' at position {i}")
             if "]" not in path_str[i:]:
                 raise ValueError(f"Unmatched '[' in path at position {i}")
             j = path_str.index("]", i)
@@ -1789,7 +1796,7 @@ def parse_item_filter(text):
 DETAIL_MODES = ("count", "quality", "color")
 
 
-LABEL_W = 36
+LABEL_W = 40
 
 
 def item_detail(v, mode):
@@ -3869,11 +3876,11 @@ def cmd_export(args):
         out["items"].append({
             "index": i,
             "label": gameid_label(guid, gj.get("_id"), mods),
-            id: gj.get("_id"), "modGuid": guid,
+            "id": gj.get("_id"), "modGuid": guid,
             "count": it.get("_count"), "quality": it.get("_quality"),
             "slot": it.get("_equipedSlot"),
             "colors": [color_hex(c) for c in (it.get("_colors") or []) if is_color_dict(c)],
-            guid: (it.get("UniqueItemGuid") or {}).get("serializedGuid"),
+            "guid": (it.get("UniqueItemGuid") or {}).get("serializedGuid"),
         })
     for s in (data.get("itemManager") or {}).get("sets") or []:
         out["sets"].append({"name": s.get("Name"), "items": len(s.get("EquippedItems") or [])})
