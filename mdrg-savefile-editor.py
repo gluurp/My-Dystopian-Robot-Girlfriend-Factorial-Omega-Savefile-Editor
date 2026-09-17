@@ -598,8 +598,6 @@ def file_type(path):
         return "slot"
     if p.startswith("!") or p.startswith("Ω"):
         return "sentinel"
-    if p.startswith("save") and ".mdrg" in p:
-        return "old_save"
     return "unknown"
 
 
@@ -705,7 +703,7 @@ def cmd_scan(args):
                             summary += f" | slot{s.get('slot','?')}: {s.get('description','')}"
                 elif ft == "playerprefs":
                     summary = "; ".join(f"{e['Key']}={e['Value']}" for e in data.get("data", []))
-            except Exception as e:
+            except (OSError, json.JSONDecodeError, ValueError) as e:
                 summary = f"parse error: {e}"
         print(f"{f.name:<60} {ft:<14} {size:>10} {summary}")
 
@@ -897,7 +895,7 @@ def cmd_analyze(args):
 def cmd_flags(args):
     """List all flags from a slot file"""
     path = Path(args.file)
-    data = load_json(path)
+    data = load_data(path)
     flags = data.get("flags", [])
     if not flags:
         print(f"No flags in {path.name}")
@@ -914,7 +912,7 @@ def cmd_flags(args):
 def cmd_emails(args):
     """List emails from a slot file"""
     path = Path(args.file)
-    data = load_json(path)
+    data = load_data(path)
     emails = data.get("_allEmails", [])
     if not emails:
         print(f"No emails in {path.name}")
@@ -1017,7 +1015,7 @@ def cmd_diff(args):
             removed.append((k, v1))
         elif k2 and not k1:
             added.append((k, v2))
-        elif v1 != v2:
+        elif v1 != v2 or type(v1) != type(v2):
             changed.append((k, v1, v2))
     if added:
         print("Added fields:")
@@ -3241,12 +3239,8 @@ def _interactive_edit(stdscr, data, path, save_root=None):
                         idx = int(name[1:-1])
                         edit_parent = current
                         edit_key = str(idx)
-                    edit_target = (
-                        current[name] if isinstance(current, dict)
-                        else current[idx]
-                    )
                     edit_buffer = edit_prefill(
-                        edit_parent, edit_key, edit_target
+                        edit_parent, edit_key
                     )
                     edit_mode = True
                     edit_dirty = False
