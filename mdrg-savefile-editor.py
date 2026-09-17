@@ -583,7 +583,7 @@ def save_data(path, data):
     with open(path, "w", encoding="utf-8", newline="\n") as f:
         json.dump(data, f, indent=2, ensure_ascii=False)
     if fixes:
-        print(f"  (normalised {len(fixes)} item colour channel(s) to float 0..1)")
+        print(f"  (normalized {len(fixes)} item color channel(s) to float 0..1)")
     return bak
 
 
@@ -1573,7 +1573,7 @@ def find_guids(data: Any) -> list:
 
 
 def is_color_dict(d: Any) -> bool:
-    """True if d looks exactly like a colour entry {r,g,b[,a]} of numbers"""
+    """True if d looks exactly like a color entry {r,g,b[,a]} of numbers"""
     if not isinstance(d, dict) or not d:
         return False
     if not set(d.keys()) <= set(_COLOR_KEYS):
@@ -1598,13 +1598,13 @@ def from255(n: Any) -> int:
 
 
 def color_hex(d):
-    """#RRGGBB preview for a colour dict"""
+    """#RRGGBB preview for a color dict"""
     return "#{:02X}{:02X}{:02X}".format(
         to255(d.get("r", 0)), to255(d.get("g", 0)), to255(d.get("b", 0)))
 
 
 def coerce_color(text, old):
-    """Interpret user input for one colour channel
+    """Interpret user input for one color channel
 
     > 1   -> treated as 0..255 and divided by 255
     0..1  -> literal float (legacy/float entry)
@@ -1621,11 +1621,11 @@ def coerce_color(text, old):
 
 
 def normalize_colors(data):
-    """Force ITEM colour entries (`_colors[]`) to float 0..1
+    """Force ITEM color entries (`_colors[]`) to float 0..1
 
     *** Only dicts reached through a key named `_colors` are touched ***
 
-    The game uses TWO different colour encodings:
+    The game uses TWO different color encodings:
         itemManager.items[]._colors[]           -> FLOATS 0..1
         botStatusAppManager._consoleStyle.*     -> INTS   0..255
     A blanket sweep over every {r,g,b,a} dict would silently divide the UI-style
@@ -1673,7 +1673,7 @@ def cmd_set(args: Any) -> int:
         leaf = parts[-1][1] if parts else None
         if parent is not None and leaf in _COLOR_KEYS and is_color_dict(parent):
             if isinstance(value, bool) or not isinstance(value, (int, float)):
-                print(f"Error: colour channel '{leaf}' needs a number (0-255 or 0.0-1.0)",
+                print(f"Error: color channel '{leaf}' needs a number (0-255 or 0.0-1.0)",
                       file=sys.stderr)
                 sys.exit(1)
             value = coerce_color(str(value), parent.get(leaf, 0.0))
@@ -1840,7 +1840,7 @@ def item_detail(v, mode):
 def item_preview(v: Any, mods: dict = None, detail: str = "count") -> str:
     """Compact one-line preview of an item record, or "" if `v` is not one
 
-    Name, then the value the detail cycler is set to - count, quality or colour
+    Name, then the value the detail cycler is set to - count, quality or color
 
     The equip slot is deliberately absent. Which slot an item belongs in is
     already implied by the item, so a slot column said nothing a reader did not
@@ -1857,7 +1857,7 @@ def item_preview(v: Any, mods: dict = None, detail: str = "count") -> str:
 def editor_child_value(v, mods=None, detail="count"):
     """Value string for a child row
 
-    Colour dicts show a hex swatch. Item records show an item_preview, which
+    Color dicts show a hex swatch. Item records show an item_preview, which
     beats the "{dict 17}" placeholder - the type column right next to it already
     carries the dict/N size, so the placeholder was pure redundancy. Having the
     name in this column also makes `/Manicure` filter the item list by name
@@ -1871,14 +1871,14 @@ def editor_child_value(v, mods=None, detail="count"):
 
 
 def editor_scalar_value(parent, key, v):
-    """Value string for a scalar row (colour channels shown as 0..255)"""
+    """Value string for a scalar row (color channels shown as 0..255)"""
     if key in _COLOR_KEYS and is_color_dict(parent) and isinstance(v, (int, float)):
         return f"{to255(v):>3}/255   {float(v):.6g}"
     return format_value(v)
 
 
 def edit_prefill(parent, key, value):
-    """Initial edit buffer: colour channels start as 0..255 integers"""
+    """Initial edit buffer: color channels start as 0..255 integers"""
     if key in _COLOR_KEYS and is_color_dict(parent) and isinstance(value, (int, float)):
         return str(to255(value))
     return repr(value)
@@ -2565,15 +2565,15 @@ def _handle_edit_key(key, edit_mode, edit_buffer, edit_key, edit_parent,
                 except Exception as e2:
                     print(f"Error: {e2}", file=sys.stderr)
         return (False, "", "", None, False, saved_flag, status_msg, True)
-    elif key in (9,):  # Tab for toggle type / colour representation
+    elif key in (9,):  # Tab for toggle type / color representation
         if edit_parent is not None and edit_key is not None:
             cur = edit_parent.get(edit_key) if isinstance(edit_parent, dict) else None
-            is_colour_channel = (
+            is_color_channel = (
                 edit_key in _COLOR_KEYS
                 and is_color_dict(edit_parent)
                 and isinstance(cur, (int, float))
             )
-            if is_colour_channel:
+            if is_color_channel:
                 edit_buffer = (f"{float(cur):.6g}" if edit_buffer.strip() == str(to255(cur))
                                else str(to255(cur)))
             elif isinstance(cur, bool):
@@ -3144,13 +3144,13 @@ def _render_screen(st, stdscr, h, w, mods, path):
             "entries": [
                 ("e", "edit the selected scalar"),
                 ("Tab", "cycle value type (bool/int/float/str)"),
-                ("+ -  [ ]", "adjust (colour mode: +/-1 / +/-8)"),
-                ("H", "colour: enter #RRGGBB"),
+                ("+ -  [ ]", "adjust (color mode: +/-1 / +/-8)"),
+                ("H", "color: enter #RRGGBB"),
                 ("n", "add a key (dict) or append a value (list)"),
                 ("r", "rename the selected key"),
                 ("m", "grab the entry, w/s carry it, m drops it"),
                 ("", "any other key cancels the grab"),
-                ("v", "cycle the item column: count / quality / colour"),
+                ("v", "cycle the item column: count / quality / color"),
                 ("x", "delete the selected key / list entry"),
                 ("c", "clone entry (fresh guid for items)"),
                 ("y / p", "yank value / paste into the selection"),
@@ -3312,7 +3312,7 @@ def _render_screen(st, stdscr, h, w, mods, path):
         "x:del  c:clone  y/p  n:add  u:undo U:redo  ?:help  o:save  q:quit "
     )
     if is_color_dict(st['current']):
-        footer = (" colour: ↑↓:channel  +/-:±1  [ ]:±8  H:hex  e/→:type 0-255  "
+        footer = (" color: ↑↓:channel  +/-:±1  [ ]:±8  H:hex  e/→:type 0-255  "
                   "u:undo U:redo  ?:help  o:save  q:quit ")
     try:
         stdscr.addstr(h - 1, 0, footer[: w - 1], curses.color_pair(7))
@@ -3719,7 +3719,7 @@ def _interactive_edit(stdscr, data: Any, path: Path, save_root: Any = None) -> A
                 pass
         else:
             # everything else: yank/paste/delete/clone/enter/edit/
-            # colour adjust/hex/add/rename/grab-start
+            # color adjust/hex/add/rename/grab-start
             sk_st = {
                 'yank_buf': yank_buf, 'status_msg': status_msg,
                 'saved_flag': saved_flag, 'selected': selected,
@@ -3814,7 +3814,7 @@ def select_items(data: Any, selector: str) -> list:
 
 
 def cmd_inventory(args: Any) -> int:
-    """Rich inventory listing with names, slots, colours and filtering"""
+    """Rich inventory listing with names, slots, colors and filtering"""
     load_item_names()
     paths = collect_files(args.files)
     total = 0
@@ -3903,7 +3903,7 @@ def cmd_find(args: Any) -> int:
 
 
 def cmd_color(args: Any) -> int:
-    """View or set an item's colours (0..255 in, float 0..1 out)"""
+    """View or set an item's colors (0..255 in, float 0..1 out)"""
     path = Path(args.file)
     data = load_data(path)
     load_item_names()
@@ -4061,7 +4061,7 @@ def cmd_equip(args: Any) -> int:
 
 
 def cmd_validate(args: Any) -> int:
-    """Sanity-check a save (colours, ids, guids, slots, counts)"""
+    """Sanity-check a save (colors, ids, guids, slots, counts)"""
     path = Path(args.file)
     data = load_data(path)
     items = (data.get("itemManager") or {}).get("items") or []
@@ -4095,7 +4095,7 @@ def cmd_validate(args: Any) -> int:
             slot_counts[s] += 1
 
     if bad_colors:
-        problems.append(f"{bad_colors} colour channel(s) not float 0..1")
+        problems.append(f"{bad_colors} color channel(s) not float 0..1")
     if unknown:
         warns.append(f"unknown vanilla ids: {dict(unknown.most_common(8))}")
     multi = {s: n for s, n in slot_counts.items() if n > 1}
@@ -4153,7 +4153,7 @@ def cmd_backups(args: Any) -> int:
 
 
 def cmd_tree(args: Any) -> int:
-    """Dump a file with item names resolved and colours as hex"""
+    """Dump a file with item names resolved and colors as hex"""
     path = Path(args.file)
     data = load_data(path)
     mods = mod_names(data)
@@ -4198,7 +4198,7 @@ def cmd_tree(args: Any) -> int:
 
 
 def cmd_export(args: Any) -> int:
-    """Export a save to a normalised JSON with item names resolved"""
+    """Export a save to a normalized JSON with item names resolved"""
     path = Path(args.file)
     data = load_data(path)
     mods = mod_names(data)
@@ -4327,7 +4327,7 @@ def main():
     p_inv.add_argument("-e", "--equipped", action="store_true", help="Only equipped items")
     p_inv.add_argument("--mod", action="store_true", help="Only mod items")
     p_inv.add_argument("--vanilla", action="store_true", help="Only vanilla items")
-    p_inv.add_argument("-c", "--colors", type=int, help="Only items with N colour channels")
+    p_inv.add_argument("-c", "--colors", type=int, help="Only items with N color channels")
 
     p_sdb = sub.add_parser("slotsdb", help="Show which items can go in each slot")
     p_sdb.add_argument("slot", nargs="?", help="Filter by slot name substring")
@@ -4339,7 +4339,7 @@ def main():
     p_find.add_argument("--deep", action="store_true",
                         help="Also match anywhere in the raw item JSON")
 
-    p_col = sub.add_parser("color", help="View or set item colours (0-255)")
+    p_col = sub.add_parser("color", help="View or set item colors (0-255)")
     p_col.add_argument("file", help="Path to .mdrgslot file")
     p_col.add_argument("item", help="Selector: @index, guid:xxxx, =Name, or a name substring")
     p_col.add_argument("--set", metavar="r=200,g=128,b=0",
@@ -4352,7 +4352,7 @@ def main():
     p_add.add_argument("-n", "--count", type=int, default=1)
     p_add.add_argument("-q", "--quality", type=float, default=1.0)
     p_add.add_argument("-s", "--slot", default="")
-    p_add.add_argument("-c", "--colors", type=int, default=1, help="Number of colour channels")
+    p_add.add_argument("-c", "--colors", type=int, default=1, help="Number of color channels")
     p_add.add_argument("--mod", help="Mod name to place it in that mod's namespace")
 
     p_del = sub.add_parser("delitem", help="Remove item(s) from the inventory")
@@ -4381,12 +4381,12 @@ def main():
     p_bak.add_argument("--restore", nargs="?", const="latest",
                        help="Restore a backup (default: latest)")
 
-    p_tree = sub.add_parser("tree", help="Dump with item names and colours resolved")
+    p_tree = sub.add_parser("tree", help="Dump with item names and colors resolved")
     p_tree.add_argument("file", help="Path to save file")
     p_tree.add_argument("--depth", type=int, default=2, help="Depth to descend (default: 2)")
     p_tree.add_argument("-o", "--out", help="Write to a file instead of stdout")
 
-    p_exp = sub.add_parser("export", help="Export a normalised JSON summary")
+    p_exp = sub.add_parser("export", help="Export a normalized JSON summary")
     p_exp.add_argument("file", help="Path to .mdrgslot file")
     p_exp.add_argument("-o", "--out", help="Output path")
 
