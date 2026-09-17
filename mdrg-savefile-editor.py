@@ -1793,6 +1793,11 @@ def parse_item_filter(text):
     return pred, ""
 
 
+def keep_filter(v, pred):
+    """Return True if `v` passes the filter predicate (or no predicate)"""
+    return pred(v) if pred else True
+
+
 DETAIL_MODES = ("count", "quality", "color")
 
 
@@ -2448,8 +2453,40 @@ def cmd_edit(args):
         return
 
 
+def _handle_save_keypress(key, path, save_root, stdscr, h, w):
+    """Handle o / Ctrl+S. Returns True if a save was performed."""
+    import curses
+    if key not in (ord("o"), ord("O"), 19):
+        return False
+    bak = save_data(path, save_root)
+    try:
+        msg = f" {CHECK} Saved (backup: {bak.name})"
+        stdscr.addstr(h - 2, 0, msg[: w - 1], curses.color_pair(3) | curses.A_BOLD)
+        stdscr.refresh()
+        curses.napms(1200)
+    except Exception as e:
+        try:
+            stdscr.addstr(h - 1, 0, f" Error: {e}"[: w - 1], curses.color_pair(4))
+            stdscr.refresh()
+        except Exception as e2:
+            print(f"Error: {e2}", file=sys.stderr)
+    return True
+
+
 def _interactive_edit(stdscr, data, path, save_root=None):
-    """Curses-based interactive editor"""
+    """Curses-based interactive editor.
+
+    Key dispatch:
+      - edit mode: _handle_edit_key (scalar editing, Tab type cycling)
+      - prompts: filter/jump/rename input
+      - grab: reorder items (m/w/s/drop)
+      - navigation: arrows, page, home/end, g/G
+      - save: o/Ctrl+S via _handle_save_keypress
+      - quit: q/ESC/a/left
+
+    The main loop renders then dispatches. Rendering and dispatch are
+    separated above so each can be reasoned about independently.
+    """
     import curses
     try:
         curses.set_escdelay(25)
@@ -2637,15 +2674,12 @@ def _interactive_edit(stdscr, data, path, save_root=None):
 
         pred = parse_item_filter(filter_text)[0]
 
-        def keep(v):
-            return pred(v) if pred else True
-
         total_children = len(current)
 
         children = []
         if isinstance(current, dict):
             for k, v in current.items():
-                if not keep(v):
+                if not keep_filter(v, pred):
                     continue
                 if isinstance(v, (dict, list)):
                     type_str = f"dict/{len(v)}" if isinstance(v, dict) else f"list/{len(v)}"
@@ -2659,7 +2693,7 @@ def _interactive_edit(stdscr, data, path, save_root=None):
                     ))
         elif isinstance(current, list):
             for i, v in enumerate(current):
-                if not keep(v):
+                if not keep_filter(v, pred):
                     continue
                 if isinstance(v, (dict, list)):
                     type_str = f"dict/{len(v)}" if isinstance(v, dict) else f"list/{len(v)}"
@@ -3354,20 +3388,9 @@ def _interactive_edit(stdscr, data, path, save_root=None):
                     except Exception as e2:
                         print(f"Error: {e2}", file=sys.stderr)
         elif key in (ord("o"), ord("O"), 19):  # 19 = Ctrl+S
-            bak = save_data(path, save_root)
-            saved_flag = False
-            quit_confirm = False
-            try:
-                msg = f" {CHECK} Saved (backup: {bak.name})"
-                stdscr.addstr(h - 2, 0, msg[: w - 1], curses.color_pair(3) | curses.A_BOLD)
-                stdscr.refresh()
-                curses.napms(1200)
-            except Exception as e:
-                try:
-                    stdscr.addstr(h - 1, 0, f" Error: {e}"[: w - 1], curses.color_pair(4))
-                    stdscr.refresh()
-                except Exception as e2:
-                    print(f"Error: {e2}", file=sys.stderr)
+            if _handle_save_keypress(key, path, save_root, stdscr, h, w):
+                saved_flag = False
+                quit_confirm = False
         elif key in (curses.KEY_LEFT, ord("a")):
             if edit_mode:
                 edit_mode = False
