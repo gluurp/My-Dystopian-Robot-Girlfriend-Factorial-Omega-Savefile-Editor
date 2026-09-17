@@ -2588,6 +2588,50 @@ def _handle_edit_key(key, edit_mode, edit_buffer, edit_key, edit_parent,
             saved_flag, status_msg, False)
 
 
+def _handle_movement(key, selected, scroll, visible, children):
+    """Handle mouse, arrows, page, home/end, Ctrl+U/D.
+
+    Returns: (selected, scroll, key) where key may be remapped by mouse.
+    """
+    import curses
+    if key == curses.KEY_MOUSE:
+        event = _mouse_event()
+        if event in ("up", "down"):
+            selected = _nudge(-1 if event == "up" else 1,
+                              selected, len(children))
+            if selected < scroll:
+                scroll = selected
+            elif selected >= scroll + visible:
+                scroll = selected - visible + 1
+        elif event == "right":
+            key = curses.KEY_LEFT
+        elif event == "left":
+            key = curses.KEY_RIGHT
+
+    if (key == curses.KEY_UP or key in (ord("w"), ord("W"))) and selected > 0:
+        selected -= 1
+        if selected < scroll:
+            scroll = selected
+    elif (key == curses.KEY_DOWN or key in (ord("s"), ord("S"))
+          ) and selected < len(children) - 1:
+        selected += 1
+        if selected >= scroll + visible:
+            scroll = selected - visible + 1
+    elif key in (curses.KEY_HOME,) or key == ord("g"):
+        selected = 0
+        scroll = 0
+    elif key in (curses.KEY_END,) or key == ord("G"):
+        selected = max(0, len(children) - 1)
+        scroll = max(0, selected - visible + 1)
+    elif key == 21:  # Ctrl+U
+        selected = max(0, selected - visible)
+        scroll = max(0, scroll - visible)
+    elif key == 4:   # Ctrl+D
+        selected = min(max(0, len(children) - 1), selected + visible)
+        scroll = max(0, min(max(0, len(children) - visible), scroll + visible))
+    return selected, scroll, key
+
+
 def _interactive_edit(stdscr, data, path, save_root=None):
     """Curses-based interactive editor.
 
@@ -3143,44 +3187,10 @@ def _interactive_edit(stdscr, data, path, save_root=None):
             if still_grabbing:
                 continue
 
-        if key == curses.KEY_MOUSE:
-            event = _mouse_event()
-            if event in ("up", "down"):
-                before = selected
-                selected = _nudge(-1 if event == "up" else 1,
-                                  selected, len(children))
-                if selected < before and selected < scroll:
-                    scroll = selected
-                elif selected > before and selected >= scroll + visible:
-                    scroll = selected - visible + 1
-            elif event == "right":
-                key = curses.KEY_LEFT      # back, the same as 'a'
-            elif event == "left":
-                key = curses.KEY_RIGHT     # forward, the same as 'd'
+        selected, scroll, key = _handle_movement(
+            key, selected, scroll, visible, children)
 
-        if (key == curses.KEY_UP or key in (ord("w"), ord("W"))) and selected > 0:
-            selected -= 1
-            if selected < scroll:
-                scroll = selected
-        elif (
-            key == curses.KEY_DOWN or key in (ord("s"), ord("S"))
-        ) and selected < len(children) - 1:
-            selected += 1
-            if selected >= scroll + visible:
-                scroll = selected - visible + 1
-        elif key in (curses.KEY_HOME,) or key == ord("g"):
-            selected = 0
-            scroll = 0
-        elif key in (curses.KEY_END,) or key == ord("G"):
-            selected = max(0, len(children) - 1)
-            scroll = max(0, selected - visible + 1)
-        elif key == 21:  # Ctrl+U
-            selected = max(0, selected - visible)
-            scroll = max(0, scroll - visible)
-        elif key == 4:   # Ctrl+D
-            selected = min(max(0, len(children) - 1), selected + visible)
-            scroll = max(0, min(max(0, len(children) - visible), scroll + visible))
-        elif key == ord("/"):
+        if key == ord("/"):
             filter_prompt = True
             filter_buffer = filter_text
             status_msg = ""
