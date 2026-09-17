@@ -3025,6 +3025,283 @@ def _handle_special_keys(key, st, children, snapshot, recall_filter,
                     print(f"Error: {e2}", file=sys.stderr)
 
 
+def _render_screen(st, stdscr, h, w, mods, path):
+    """Draw the editor screen. Reads state from `st` dict.
+
+    `st` keys: current, current_path_str, selected, scroll,
+    filter_text, saved_flag, help_mode, detail_mode, status_msg,
+    filter_prompt, jump_prompt, rename_prompt, filter_buffer,
+    jump_buffer, rename_buffer, edit_mode, edit_key, edit_buffer,
+    edit_parent, grab_from, grab_pos, last_was_nudge.
+    """
+    import curses
+    pred = parse_item_filter(st['filter_text'])[0]
+    total_children = len(st['current'])
+    children = []
+    if isinstance(st['current'], dict):
+        for k, v in st['current'].items():
+            if not keep_filter(v, pred):
+                continue
+            if isinstance(v, (dict, list)):
+                type_str = f"dict/{len(v)}" if isinstance(v, dict) else f"list/{len(v)}"
+                children.append((k, BULLET, type_str,
+                                 editor_child_value(v, mods, st['detail_mode']),
+                                 "container"))
+            else:
+                children.append((
+                    k, " ", "scalar",
+                    editor_scalar_value(st['current'], k, v), "scalar"
+                ))
+    elif isinstance(st['current'], list):
+        for i, v in enumerate(st['current']):
+            if not keep_filter(v, pred):
+                continue
+            if isinstance(v, (dict, list)):
+                type_str = f"dict/{len(v)}" if isinstance(v, dict) else f"list/{len(v)}"
+                children.append((
+                    f"[{i}]", BULLET, type_str,
+                    editor_child_value(v, mods, st['detail_mode']), "container"
+                ))
+            else:
+                children.append((f"[{i}]", " ", "scalar", format_value(v), "scalar"))
+
+    if st['filter_text'] and pred is None:
+        ft = st['filter_text'].lower()
+        children = [c for c in children
+                    if ft in str(c[0]).lower() or ft in str(c[3]).lower()]
+
+    if st['selected'] >= len(children):
+        st['selected'] = max(0, len(children) - 1)
+    if st['scroll'] > st['selected']:
+        st['scroll'] = max(0, st['selected'])
+        st['scroll'] = 0
+
+    if st['grab_from'] is not None:
+        order = list(range(len(children)))
+        order.insert(st['grab_pos'], order.pop(st['grab_from']))
+        children = [children[i] for i in order]
+
+    if st['filter_text']:
+        pos = (f" [{st['selected'] + 1}/{len(children)}/{total_children}]"
+               if children else f" [0/{total_children}]")
+    else:
+        pos = (f" [{st['selected'] + 1}/{total_children}]"
+               if children else " [0/0]")
+    filt = f"  /{st['filter_text']}" if st['filter_text'] else ""
+    try:
+        hdr = (f" mdrg-savefile-editor edit {DASH} {path.name}{pos}{filt} ")
+        stdscr.addstr(0, 0, hdr[: w - 1].ljust(w - 1), curses.A_BOLD | curses.A_REVERSE)
+    except curses.error:
+        pass
+
+    try:
+        stdscr.addstr(1, 0, f" Path: {st['current_path_str']}"[: w - 1], curses.color_pair(1))
+    except curses.error:
+        pass
+
+    HELP_SECTIONS = [
+        {
+            "title": "Navigation",
+            "entries": [
+                (f"{UP}{DN}  W S", "move selection"),
+                (f"{LEFT}  A  ESC", "go up one level / clear filter"),
+                (f"{RIGHT}  D  Enter", "descend / edit scalar"),
+                ("g / G", "jump to first / last entry"),
+                ("Ctrl+U / Ctrl+D", "page up / page down"),
+                ("Home / End", "first / last"),
+                ("/", "filter entries (ESC clears)"),
+                ("", "/text matches a name or value; %q<1 compares quality"),
+                ("", "and %c>=2 how many you own (%quality/%count work too)"),
+                ("", "each level keeps its own filter, so it comes back"),
+                ("", "whenever you return - from either direction"),
+                (":", "jump to a path, e.g. itemManager.items[0]._count"),
+                ("wheel", "scroll one row per notch"),
+                ("left / right click", "forward / back, same as D and A"),
+            ],
+        },
+        {
+            "title": "Editing",
+            "entries": [
+                ("e", "edit the selected scalar"),
+                ("Tab", "cycle value type (bool/int/float/str)"),
+                ("+ -  [ ]", "adjust (colour mode: +/-1 / +/-8)"),
+                ("H", "colour: enter #RRGGBB"),
+                ("n", "add a key (dict) or append a value (list)"),
+                ("r", "rename the selected key"),
+                ("m", "grab the entry, w/s carry it, m drops it"),
+                ("", "any other key cancels the grab"),
+                ("v", "cycle the item column: count / quality / colour"),
+                ("x", "delete the selected key / list entry"),
+                ("c", "clone entry (fresh guid for items)"),
+                ("y / p", "yank value / paste into the selection"),
+                ("u  U", "undo / redo (Ctrl+R / Ctrl+Y also work)"),
+                ("", "either way you stay in the directory you were in"),
+            ],
+        },
+        {
+            "title": "Files",
+            "entries": [
+                ("o  Ctrl+S", "save (makes a .bak first)"),
+                ("q", "quit (asks again if there are unsaved changes)"),
+                ("?", "close this help"),
+            ],
+        },
+        {
+            "title": "Note",
+            "entries": [
+                ("ESC", "never quits — arrow keys send ESC and a split read;"),
+                ("",     "otherwise the editor would close mid-navigation"),
+            ],
+        },
+    ]
+
+    if st['help_mode']:
+        y = 2
+        for section in HELP_SECTIONS:
+            if y < h - 1 and section["title"]:
+                try:
+                    stdscr.addstr(y, 1, section["title"], curses.color_pair(2) | curses.A_BOLD)
+                except curses.error:
+                    pass
+                y += 1
+
+            for key, desc in section["entries"]:
+                if y >= h - 1:
+                    break
+                if not key and not desc:
+                    continue
+                try:
+                    if desc:
+                        stdscr.addstr(y, 1, f" {key:<18}", curses.color_pair(3) | curses.A_BOLD)
+                        stdscr.addstr(y, 20, desc[: w - 22])
+                    else:
+                        stdscr.addstr(y, 1, key, curses.color_pair(2) | curses.A_BOLD)
+                except curses.error:
+                    pass
+                y += 1
+
+            if y < h - 1:
+                y += 1
+
+            if y >= h - 1:
+                break
+
+        stdscr.refresh()
+        stdscr.getch()
+        st['help_mode'] = False
+        return True
+
+    if isinstance(st['current'], dict):
+        type_line = f" Type: dict ({len(st['current'])} keys)"
+    elif isinstance(st['current'], list):
+        type_line = f" Type: list ({len(st['current'])} items)"
+    else:
+        type_line = f" Type: {type(st['current']).__name__}"
+    type_line += f"    detail: {st['detail_mode']}"
+    if st['status_msg']:
+        type_line += f"    {st['status_msg']}"
+    try:
+        stdscr.addstr(2, 0, type_line[: w - 1],
+                      curses.color_pair(3) if st['status_msg'] else 0)
+    except curses.error:
+        pass
+
+    row = 3
+    for extra in item_context_lines(st['current'], mods):
+        try:
+            stdscr.addstr(row, 0, extra[: w - 1], curses.color_pair(2))
+        except curses.error:
+            pass
+        row += 1
+
+    start_row = row
+
+    if st['filter_prompt'] or st['jump_prompt'] or st['rename_prompt']:
+        if st['filter_prompt']:
+            label, buf = " filter ", st['filter_buffer']
+        elif st['jump_prompt']:
+            label, buf = " jump to ", st['jump_buffer']
+        else:
+            label, buf = " rename to ", st['rename_buffer']
+        try:
+            stdscr.addstr(row, 0, f"{label}{buf}_"[: w - 1],
+                          curses.color_pair(3) | curses.A_BOLD)
+            stdscr.addstr(row + 1, 0, " Enter:confirm  ESC:cancel"[: w - 1],
+                          curses.color_pair(7))
+        except curses.error:
+            pass
+        start_row = row + 3
+
+    if st['edit_mode']:
+        try:
+            stdscr.addstr(
+                row, 0,
+                f" Edit {st['edit_key']}: {st['edit_buffer']}_"[: w - 1],
+                curses.color_pair(3) | curses.A_BOLD
+            )
+        except curses.error:
+            pass
+        if st['edit_parent'] is not None:
+            try:
+                current_val = editor_scalar_value(
+                    st['edit_parent'], st['edit_key'], st['edit_parent'][st['edit_key']]
+                )
+                stdscr.addstr(
+                    row + 1, 0,
+                    f" Current: {current_val}"[: w - 1],
+                    curses.color_pair(2),
+                )
+            except Exception:
+                pass
+        try:
+            hint = (" Enter:confirm  ESC:cancel  "
+                    "channel input accepts 0-255 or 0.0-1.0"
+                    if (st['edit_key'] in _COLOR_KEYS
+                        and is_color_dict(st['edit_parent'] or {}))
+                    else " Enter:confirm  ESC:cancel  Tab:toggle type")
+            stdscr.addstr(row + 2, 0, hint[: w - 1], curses.color_pair(7))
+        except curses.error:
+            pass
+        start_row = row + 4
+
+    visible = max(1, h - start_row - 2)
+    end = min(st['scroll'] + visible, len(children))
+    for i in range(st['scroll'], end):
+        if i < 0 or i >= len(children):
+            continue
+        name, icon, type_str, val_str, kind = children[i]
+        if st['grab_from'] is not None and i == st['grab_pos']:
+            icon = "\u2725" if _UNI else "*"
+        line = f" {icon} {name:<28} {type_str:>12}  {val_str}"
+        line = line[: w - 1]
+        attr = 0
+        if i == st['selected']:
+            attr |= curses.color_pair(6) | curses.A_BOLD
+        elif kind == "scalar":
+            attr |= curses.color_pair(3)
+        else:
+            attr |= curses.color_pair(8)
+        try:
+            stdscr.addstr(start_row + i - st['scroll'], 0, line, attr)
+        except curses.error:
+            pass
+
+    footer = (
+        " ↑↓←→:nav  /:filter  ::jump  e:edit  r:rename  m:grab  v:detail  "
+        "x:del  c:clone  y/p  n:add  u:undo U:redo  ?:help  o:save  q:quit "
+    )
+    if is_color_dict(st['current']):
+        footer = (" colour: ↑↓:channel  +/-:±1  [ ]:±8  H:hex  e/→:type 0-255  "
+                  "u:undo U:redo  ?:help  o:save  q:quit ")
+    try:
+        stdscr.addstr(h - 1, 0, footer[: w - 1], curses.color_pair(7))
+    except curses.error:
+        pass
+
+    stdscr.refresh()
+    return False
+
+
 def _interactive_edit(stdscr, data, path, save_root=None):
     """Curses-based interactive editor.
 
@@ -3224,269 +3501,49 @@ def _interactive_edit(stdscr, data, path, save_root=None):
             stdscr.getch()
             continue
 
-        pred = parse_item_filter(filter_text)[0]
-
-        total_children = len(current)
-
-        children = []
-        if isinstance(current, dict):
-            for k, v in current.items():
-                if not keep_filter(v, pred):
-                    continue
-                if isinstance(v, (dict, list)):
-                    type_str = f"dict/{len(v)}" if isinstance(v, dict) else f"list/{len(v)}"
-                    children.append((k, BULLET, type_str,
-                                     editor_child_value(v, mods, detail_mode),
-                                     "container"))
-                else:
-                    children.append((
-                        k, " ", "scalar",
-                        editor_scalar_value(current, k, v), "scalar"
-                    ))
-        elif isinstance(current, list):
-            for i, v in enumerate(current):
-                if not keep_filter(v, pred):
-                    continue
-                if isinstance(v, (dict, list)):
-                    type_str = f"dict/{len(v)}" if isinstance(v, dict) else f"list/{len(v)}"
-                    children.append((
-                        f"[{i}]", BULLET, type_str,
-                        editor_child_value(v, mods, detail_mode), "container"
-                    ))
-                else:
-                    children.append((f"[{i}]", " ", "scalar", format_value(v), "scalar"))
-
-        if filter_text and pred is None:
-            ft = filter_text.lower()
-            children = [c for c in children
-                        if ft in str(c[0]).lower() or ft in str(c[3]).lower()]
-
-        if selected >= len(children):
-            selected = max(0, len(children) - 1)
-        if scroll > selected:
-            scroll = max(0, selected)
-            scroll = 0
-
-        if grab_from is not None:
-            order = list(range(len(children)))
-            order.insert(grab_pos, order.pop(grab_from))
-            children = [children[i] for i in order]
-
-        if filter_text:
-            pos = f" [{selected + 1}/{len(children)}/{total_children}]" if children else f" [0/{total_children}]"
-        else:
-            pos = f" [{selected + 1}/{total_children}]" if children else " [0/0]"
-        filt = f"  /{filter_text}" if filter_text else ""
-        try:
-            hdr = f" mdrg-savefile-editor edit {DASH} {path.name}{pos}{filt} "
-            stdscr.addstr(0, 0, hdr[: w - 1].ljust(w - 1), curses.A_BOLD | curses.A_REVERSE)
-        except curses.error:
-            pass
-
-        try:
-            stdscr.addstr(1, 0, f" Path: {current_path_str}"[: w - 1], curses.color_pair(1))
-        except curses.error:
-            pass
-
-        HELP_SECTIONS = [
-            {
-                "title": "Navigation",
-                "entries": [
-                    (f"{UP}{DN}  W S", "move selection"),
-                    (f"{LEFT}  A  ESC", "go up one level / clear filter"),
-                    (f"{RIGHT}  D  Enter", "descend / edit scalar"),
-                    ("g / G", "jump to first / last entry"),
-                    ("Ctrl+U / Ctrl+D", "page up / page down"),
-                    ("Home / End", "first / last"),
-                    ("/", "filter entries (ESC clears)"),
-                    ("", "/text matches a name or value; %q<1 compares quality"),
-                    ("", "and %c>=2 how many you own (%quality/%count work too)"),
-                    ("", "each level keeps its own filter, so it comes back"),
-                    ("", "whenever you return - from either direction"),
-                    (":", "jump to a path, e.g. itemManager.items[0]._count"),
-                    ("wheel", "scroll one row per notch"),
-                    ("left / right click", "forward / back, same as D and A"),
-                ],
-            },
-            {
-                "title": "Editing",
-                "entries": [
-                    ("e", "edit the selected scalar"),
-                    ("Tab", "cycle value type (bool/int/float/str)"),
-                    ("+ -  [ ]", "adjust (colour mode: +/-1 / +/-8)"),
-                    ("H", "colour: enter #RRGGBB"),
-                    ("n", "add a key (dict) or append a value (list)"),
-                    ("r", "rename the selected key"),
-                    ("m", "grab the entry, w/s carry it, m drops it"),
-                    ("", "any other key cancels the grab"),
-                    ("v", "cycle the item column: count / quality / colour"),
-                    ("x", "delete the selected key / list entry"),
-                    ("c", "clone entry (fresh guid for items)"),
-                    ("y / p", "yank value / paste into the selection"),
-                    ("u  U", "undo / redo (Ctrl+R / Ctrl+Y also work)"),
-                    ("", "either way you stay in the directory you were in"),
-                ],
-            },
-            {
-                "title": "Files",
-                "entries": [
-                    ("o  Ctrl+S", "save (makes a .bak first)"),
-                    ("q", "quit (asks again if there are unsaved changes)"),
-                    ("?", "close this help"),
-                ],
-            },
-            {
-                "title": "Note",
-                "entries": [
-                    ("ESC", "never quits — arrow keys send ESC and a split read;"),
-                    ("",     "otherwise the editor would close mid-navigation"),
-                ],
-            },
-        ]
-
-        if help_mode:
-            y = 2
-            for section in HELP_SECTIONS:
-                if y < h - 1 and section["title"]:
-                    try:
-                        stdscr.addstr(y, 1, section["title"], curses.color_pair(2) | curses.A_BOLD)
-                    except curses.error:
-                        pass
-                    y += 1
-
-                for key, desc in section["entries"]:
-                    if y >= h - 1:
-                        break
-                    if not key and not desc:
-                        continue
-                    try:
-                        if desc:
-                            stdscr.addstr(y, 1, f" {key:<18}", curses.color_pair(3) | curses.A_BOLD)
-                            stdscr.addstr(y, 20, desc[: w - 22])
-                        else:
-                            stdscr.addstr(y, 1, key, curses.color_pair(2) | curses.A_BOLD)
-                    except curses.error:
-                        pass
-                    y += 1
-
-                if y < h - 1:
-                    y += 1
-
-                if y >= h - 1:
-                    break
-
-            stdscr.refresh()
-            stdscr.getch()
-            help_mode = False
+        st = {
+            'current': current, 'current_path_str': current_path_str,
+            'selected': selected, 'scroll': scroll,
+            'filter_text': filter_text, 'saved_flag': saved_flag,
+            'help_mode': help_mode, 'detail_mode': detail_mode,
+            'status_msg': status_msg,
+            'filter_prompt': filter_prompt, 'jump_prompt': jump_prompt,
+            'rename_prompt': rename_prompt, 'filter_buffer': filter_buffer,
+            'jump_buffer': jump_buffer, 'rename_buffer': rename_buffer,
+            'edit_mode': edit_mode, 'edit_key': edit_key,
+            'edit_buffer': edit_buffer, 'edit_parent': edit_parent,
+            'grab_from': grab_from, 'grab_pos': grab_pos,
+            'last_was_nudge': last_was_nudge,
+        }
+        if _render_screen(st, stdscr, h, w, mods, path):
             continue
-
-        if isinstance(current, dict):
-            type_line = f" Type: dict ({len(current)} keys)"
-        elif isinstance(current, list):
-            type_line = f" Type: list ({len(current)} items)"
-        else:
-            type_line = f" Type: {type(current).__name__}"
-        type_line += f"    detail: {detail_mode}"
-        if status_msg:
-            type_line += f"    {status_msg}"
-        try:
-            stdscr.addstr(2, 0, type_line[: w - 1],
-                          curses.color_pair(3) if status_msg else 0)
-        except curses.error:
-            pass
-
-        row = 3
-        for extra in item_context_lines(current, mods):
-            try:
-                stdscr.addstr(row, 0, extra[: w - 1], curses.color_pair(2))
-            except curses.error:
-                pass
-            row += 1
-
-        start_row = row
-
-        if filter_prompt or jump_prompt or rename_prompt:
-            if filter_prompt:
-                label, buf = " filter ", filter_buffer
-            elif jump_prompt:
-                label, buf = " jump to ", jump_buffer
-            else:
-                label, buf = " rename to ", rename_buffer
-            try:
-                stdscr.addstr(row, 0, f"{label}{buf}_"[: w - 1],
-                              curses.color_pair(3) | curses.A_BOLD)
-                stdscr.addstr(row + 1, 0, " Enter:confirm  ESC:cancel"[: w - 1],
-                              curses.color_pair(7))
-            except curses.error:
-                pass
-            start_row = row + 3
-
-        if edit_mode:
-            try:
-                stdscr.addstr(
-                    row, 0,
-                    f" Edit {edit_key}: {edit_buffer}_"[: w - 1],
-                    curses.color_pair(3) | curses.A_BOLD
-                )
-            except curses.error:
-                pass
-            if edit_parent is not None:
-                try:
-                    current_val = editor_scalar_value(
-                        edit_parent, edit_key, edit_parent[edit_key]
-                    )
-                    stdscr.addstr(
-                        row + 1, 0,
-                        f" Current: {current_val}"[: w - 1],
-                        curses.color_pair(2),
-                    )
-                except Exception:
-                    pass
-            try:
-                hint = (" Enter:confirm  ESC:cancel  "
-                        "channel input accepts 0-255 or 0.0-1.0"
-                        if (edit_key in _COLOR_KEYS and is_color_dict(edit_parent or {}))
-                        else " Enter:confirm  ESC:cancel  Tab:toggle type")
-                stdscr.addstr(row + 2, 0, hint[: w - 1], curses.color_pair(7))
-            except curses.error:
-                pass
-            start_row = row + 4
-
-        visible = max(1, h - start_row - 2)
-        end = min(scroll + visible, len(children))
-        for i in range(scroll, end):
-            if i < 0 or i >= len(children):
-                continue
-            name, icon, type_str, val_str, kind = children[i]
-            if grab_from is not None and i == grab_pos:
-                icon = "\u2725" if _UNI else "*"
-            line = f" {icon} {name:<28} {type_str:>12}  {val_str}"
-            line = line[: w - 1]
-            attr = 0
-            if i == selected:
-                attr |= curses.color_pair(6) | curses.A_BOLD
-            elif kind == "scalar":
-                attr |= curses.color_pair(3)
-            else:
-                attr |= curses.color_pair(8)
-            try:
-                stdscr.addstr(start_row + i - scroll, 0, line, attr)
-            except curses.error:
-                pass
-
-        footer = (
-            " ↑↓←→:nav  /:filter  ::jump  e:edit  r:rename  m:grab  v:detail  "
-            "x:del  c:clone  y/p  n:add  u:undo U:redo  ?:help  o:save  q:quit "
-        )
-        if is_color_dict(current):
-            footer = (" colour: ↑↓:channel  +/-:±1  [ ]:±8  H:hex  e/→:type 0-255  "
-                      "u:undo U:redo  ?:help  o:save  q:quit ")
-        try:
-            stdscr.addstr(h - 1, 0, footer[: w - 1], curses.color_pair(7))
-        except curses.error:
-            pass
-
-        stdscr.refresh()
+        current = st['current']
+        current_path_str = st['current_path_str']
+        selected = st['selected']
+        scroll = st['scroll']
+        filter_text = st['filter_text']
+        saved_flag = st['saved_flag']
+        help_mode = st['help_mode']
+        detail_mode = st['detail_mode']
+        status_msg = st['status_msg']
+        filter_prompt = st['filter_prompt']
+        jump_prompt = st['jump_prompt']
+        rename_prompt = st['rename_prompt']
+        filter_buffer = st['filter_buffer']
+        jump_buffer = st['jump_buffer']
+        rename_buffer = st['rename_buffer']
+        edit_mode = st['edit_mode']
+        edit_key = st['edit_key']
+        edit_buffer = st['edit_buffer']
+        edit_parent = st['edit_parent']
+        grab_from = st['grab_from']
+        grab_pos = st['grab_pos']
+        last_was_nudge = st['last_was_nudge']
+        key = stdscr.getch()
+        if key == curses.KEY_RESIZE:
+            continue
+        if key not in (ord("+"), ord("="), ord("-"), ord("["), ord("]")):
+            last_was_nudge = False
         key = stdscr.getch()
         if key == curses.KEY_RESIZE:
             continue
