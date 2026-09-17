@@ -86,7 +86,7 @@ def _console_is_unicode() -> bool:
     if not enc:
         return False
     try:
-        "─►→—✓✗±".encode(enc)
+        "─►→—✓✗±✥⌕｡:ﾟ（＾ω＾）✿".encode(enc)
     except (UnicodeEncodeError, LookupError):
         return False
     return True
@@ -1335,6 +1335,8 @@ def parse_path(path_str: str) -> list:
         i += 1
     if current:
         parts.append(("dict", current))
+    elif path_str and path_str.endswith("."):
+        raise ValueError("empty key in path (trailing dot)")
     return parts
 
 
