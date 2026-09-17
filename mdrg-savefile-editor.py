@@ -2473,6 +2473,53 @@ def _handle_save_keypress(key, path, save_root, stdscr, h, w):
     return True
 
 
+def _handle_grab_key(key, grab_from, grab_pos, children, current,
+                       selected, scroll, visible, saved_flag,
+                       status_msg, grab_label):
+    """Handle a key press while grabbing an entry.
+
+    Returns: (grab_from, grab_pos, selected, scroll, saved_flag,
+              status_msg, grab_label, still_grabbing)
+    """
+    import curses
+    if key == curses.KEY_MOUSE:
+        event = _mouse_event()
+        if event == "up":
+            key = curses.KEY_UP
+        elif event == "down":
+            key = curses.KEY_DOWN
+        else:
+            return (None, None, selected, scroll, saved_flag,
+                    "grab cancelled", "", False)
+
+    if key in (curses.KEY_UP, ord("w"), ord("W")):
+        grab_pos = max(0, grab_pos - 1)
+        selected = grab_pos
+        scroll = min(scroll, selected)
+        status_msg = _grab_status(grab_label, grab_from, grab_pos)
+    elif key in (curses.KEY_DOWN, ord("s"), ord("S")):
+        grab_pos = min(len(children) - 1, grab_pos + 1)
+        selected = grab_pos
+        if selected >= scroll + visible:
+            scroll = selected - visible + 1
+        status_msg = _grab_status(grab_label, grab_from, grab_pos)
+    elif key in (ord("m"), ord("M")):
+        if grab_pos != grab_from:
+            snapshot()
+            current.insert(grab_pos, current.pop(grab_from))
+            saved_flag = True
+        status_msg = ("grab dropped, nothing moved" if grab_pos == grab_from
+                      else f"moved to {grab_pos + 1} of {len(children)}")
+        grab_from = grab_pos = None
+        grab_label = ""
+    else:
+        grab_from = grab_pos = None
+        grab_label = ""
+        status_msg = "grab cancelled"
+    return (grab_from, grab_pos, selected, scroll, saved_flag,
+            status_msg, grab_label, True)
+
+
 def _interactive_edit(stdscr, data, path, save_root=None):
     """Curses-based interactive editor.
 
@@ -3070,42 +3117,14 @@ def _interactive_edit(stdscr, data, path, save_root=None):
             continue
 
         if grab_from is not None:
-            if key == curses.KEY_MOUSE:
-                event = _mouse_event()
-                if event == "up":
-                    key = curses.KEY_UP
-                elif event == "down":
-                    key = curses.KEY_DOWN
-                else:
-                    grab_from = grab_pos = None
-                    status_msg = "grab cancelled"
-                    continue
-
-            if key in (curses.KEY_UP, ord("w"), ord("W")):
-                grab_pos = max(0, grab_pos - 1)
-                selected = grab_pos
-                scroll = min(scroll, selected)
-                status_msg = _grab_status(grab_label, grab_from, grab_pos)
-            elif key in (curses.KEY_DOWN, ord("s"), ord("S")):
-                grab_pos = min(len(children) - 1, grab_pos + 1)
-                selected = grab_pos
-                if selected >= scroll + visible:
-                    scroll = selected - visible + 1
-                status_msg = _grab_status(grab_label, grab_from, grab_pos)
-            elif key in (ord("m"), ord("M")):
-                if grab_pos != grab_from:
-                    snapshot()
-                    current.insert(grab_pos, current.pop(grab_from))
-                    saved_flag = True
-                status_msg = ("grab dropped, nothing moved" if grab_pos == grab_from
-                              else f"moved to {grab_pos + 1} of {len(children)}")
-                grab_from = grab_pos = None
-                grab_label = ""
-            else:
-                grab_from = grab_pos = None
-                grab_label = ""
-                status_msg = "grab cancelled"
-            continue
+            grab_from, grab_pos, selected, scroll, saved_flag, \
+                status_msg, grab_label, still_grabbing = \
+                _handle_grab_key(key, grab_from, grab_pos,
+                                 children, current, selected,
+                                 scroll, visible, saved_flag,
+                                 status_msg, grab_label)
+            if still_grabbing:
+                continue
 
         if key == curses.KEY_MOUSE:
             event = _mouse_event()
