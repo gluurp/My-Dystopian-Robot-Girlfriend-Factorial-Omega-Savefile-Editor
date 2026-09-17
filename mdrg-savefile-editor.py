@@ -2796,10 +2796,8 @@ def _handle_prompts(key, st, remember_filter, parse_item_filter,
     return True
 
 
-def _handle_special_keys(key, st, children, snapshot, edit_prefill,
-                            parse_value, uuid, recall_filter,
-                            DETAIL_MODES, is_color_dict, _COLOR_KEYS,
-                            to255, from255, stdscr, h, w, sys):
+def _handle_special_keys(key, st, children, snapshot, recall_filter,
+                            stdscr, h, w):
     """Handle yank/paste/delete/clone/enter/color/hex/add-item keys.
 
     `st` keys: yank_buf, status_msg, saved_flag, selected, scroll,
@@ -3585,10 +3583,8 @@ def _interactive_edit(stdscr, data, path, save_root=None):
                 'rename_target': rename_target,
             }
             _handle_special_keys(
-                key, sk_st, children, snapshot, edit_prefill,
-                parse_value, uuid, recall_filter, DETAIL_MODES,
-                is_color_dict, _COLOR_KEYS, to255, from255,
-                stdscr, h, w, sys)
+                key, sk_st, children, snapshot, recall_filter,
+                stdscr, h, w)
             yank_buf = sk_st['yank_buf']
             status_msg = sk_st['status_msg']
             saved_flag = sk_st['saved_flag']
